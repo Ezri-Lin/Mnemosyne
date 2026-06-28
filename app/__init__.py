@@ -5,76 +5,104 @@ Mnemosyne Flask app.
 - /api/books     → JSON book list
 - /api/upload    → POST file (EPUB/PDF/MOBI) → trigger analysis
 - /api/status    → GET/PUT book status
+- /health        → liveness probe
 """
 
 import os
 import json
-import sqlite3
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, redirect, send_from_directory
+from flask import Flask, render_template, jsonify, request, redirect, send_from_directory, g
 from flask_cors import CORS
+
+from app import config
 
 app = Flask(__name__, static_folder='../static', template_folder='../static/templates')
 CORS(app)
 
-# ============ Paths ============
-ROOT = Path(__file__).parent.parent
-DATA_DIR = ROOT / 'data'
-BOOKS_DIR = DATA_DIR / 'books'
-GENERATED_DIR = DATA_DIR / 'generated'
-COVERS_DIR = DATA_DIR / 'covers'
-DB_PATH = DATA_DIR / 'mnemosyne.db'
+# ============ Per-request language ============
+@app.before_request
+def set_language():
+    """Language can be overridden per-request via ?lang=zh or Accept-Language header."""
+    req_lang = request.args.get('lang')
+    if not req_lang:
+        # Parse from Accept-Language
+        accept = request.headers.get('Accept-Language', '')
+        for part in accept.split(','):
+            code = part.split(';')[0].strip().lower()[:2]
+            if code in config.SUPPORTED_LANGUAGES:
+                req_lang = code
+                break
+    g.lang = req_lang if req_lang in config.SUPPORTED_LANGUAGES else config.LANGUAGE
 
-# Vault (Golden-House) - synced via git
-VAULT_DIR = Path(os.environ.get('VAULT_DIR', '/Users/ezri/Library/Mobile Documents/iCloud~md~obsidian/Documents/Golden House'))
-VAULT_BOOKS_DIR = VAULT_DIR / '5.0 Books & Reading' / 'Books'
+@app.context_processor
+def inject_globals():
+    return {
+        'lang': g.get('lang', config.LANGUAGE),
+        'default_lang': config.LANGUAGE,
+        'supported_languages': config.SUPPORTED_LANGUAGES,
+    }
 
 
-# ============ Database ============
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# ============ Database (with DATABASE_URL support) ============
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, Integer, Text, DateTime
+
+Base = declarative_base()
+
+class Book(Base):
+    __tablename__ = 'books'
+    slug = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    author = Column(String)
+    lang = Column(String, default='en')
+    status = Column(String, default='to-read')  # to-read, reading, completed, paused, dropped
+    rating = Column(Integer, default=0)
+    year = Column(Integer)
+    tags = Column(Text)  # JSON array
+    added_at = Column(String)
+    source_format = Column(String)  # epub, pdf, mobi, txt
+    source_path = Column(String)
+    vault_path = Column(String)
+    notes = Column(Text)
+    last_analyzed = Column(String)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
+    updated_at = Column(String, default=lambda: datetime.now().isoformat())
 
 
-def init_db():
-    """Create schema if not exists."""
-    with get_db() as conn:
-        conn.executescript('''
-            CREATE TABLE IF NOT EXISTS books (
-                slug TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT,
-                lang TEXT DEFAULT 'en',
-                status TEXT DEFAULT 'to-read',  -- to-read, reading, completed, paused, dropped
-                rating INTEGER DEFAULT 0,
-                year INTEGER,
-                tags TEXT,                        -- JSON array
-                added_at TEXT,
-                source_format TEXT,               -- epub, pdf, mobi, txt
-                source_path TEXT,                 -- relative to data/books/
-                vault_path TEXT,                  -- absolute path in vault
-                notes TEXT,                        -- user's reason for adding
-                last_analyzed TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now'))
-            );
+class SyncLog(Base):
+    __tablename__ = 'sync_log'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String)  # 'vault' or 'upload'
+    action = Column(String)  # 'create', 'update', 'analyze'
+    book_slug = Column(String)
+    status = Column(String)  # 'ok' or 'error'
+    message = Column(Text)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
 
-            CREATE INDEX IF NOT EXISTS idx_books_status ON books(status);
-            CREATE INDEX IF NOT EXISTS idx_books_lang ON books(lang);
 
-            CREATE TABLE IF NOT EXISTS sync_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source TEXT,                       -- 'vault' or 'upload'
-                action TEXT,                       -- 'create', 'update', 'analyze'
-                book_slug TEXT,
-                status TEXT,                       -- 'ok' or 'error'
-                message TEXT,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
-        ''')
+def get_engine():
+    """Create SQLAlchemy engine from DATABASE_URL."""
+    url = config.DATABASE_URL
+    if url.startswith('sqlite:///'):
+        # Ensure SQLite file path is absolute
+        path = url.replace('sqlite:///', '')
+        if not os.path.isabs(path):
+            path = str(config.ROOT / path)
+        url = f'sqlite:///{path}'
+    return create_engine(url, echo=False)
+
+
+engine = get_engine()
+SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False))
+Base.metadata.create_all(engine)
+
+
+def get_session():
+    return SessionLocal()
 
 
 # ============ Routes ============
@@ -82,18 +110,18 @@ def init_db():
 @app.route('/')
 def poster_wall():
     """Main page - poster wall."""
-    return render_template('poster-wall.html', books=get_all_books_with_vault_status())
+    return render_template('poster-wall.html', books=get_all_books())
 
 
 @app.route('/book/<slug>/')
 def book_page(slug):
     """Book architecture page. If HTML exists in data/generated/, serve it.
     Else redirect to vault or show placeholder."""
-    gen_dir = GENERATED_DIR / slug
+    gen_dir = config.GENERATED_DIR / slug
     if (gen_dir / 'index.html').exists():
         return send_from_directory(gen_dir, 'index.html')
     # Fallback: check vault (synced)
-    vault_book = VAULT_BOOKS_DIR / slug
+    vault_book = config.VAULT_BOOKS_DIR / slug
     if (vault_book / 'web' / 'index.html').exists():
         return send_from_directory(vault_book / 'web', 'index.html')
     return f"<h1>Book not yet analyzed: {slug}</h1><p><a href='/'>Back</a></p>"
@@ -102,7 +130,7 @@ def book_page(slug):
 @app.route('/chapter/<slug>/<chapter>.html')
 def chapter_page(slug, chapter):
     """Serve a specific chapter HTML."""
-    gen_file = GENERATED_DIR / slug / 'chapters' / chapter
+    gen_file = config.GENERATED_DIR / slug / 'chapters' / chapter
     if gen_file.exists():
         return send_from_directory(gen_file.parent, gen_file.name)
     return "Not found", 404
@@ -111,7 +139,7 @@ def chapter_page(slug, chapter):
 @app.route('/api/books')
 def api_books():
     """JSON list of all books."""
-    books = get_all_books_with_vault_status()
+    books = get_all_books()
     return jsonify(books)
 
 
@@ -128,7 +156,7 @@ def api_upload():
     file = request.files['file']
     title = request.form.get('title', file.filename.rsplit('.', 1)[0])
     author = request.form.get('author', 'Unknown')
-    lang = request.form.get('lang', 'en')
+    lang = request.form.get('lang', config.LANGUAGE)
     status = request.form.get('status', 'to-read')
     notes = request.form.get('notes', '')
 
@@ -137,27 +165,39 @@ def api_upload():
     ext = file.filename.rsplit('.', 1)[-1].lower()
 
     # Save file
-    book_dir = BOOKS_DIR / slug
+    book_dir = config.BOOKS_DIR / slug
     book_dir.mkdir(parents=True, exist_ok=True)
     source_path = book_dir / f"source.{ext}"
     file.save(source_path)
 
     # Insert/update DB
-    with get_db() as conn:
-        conn.execute('''
-            INSERT INTO books (slug, title, author, lang, status, tags, source_format, source_path, notes, added_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(slug) DO UPDATE SET
-                title=excluded.title,
-                author=excluded.author,
-                updated_at=datetime('now')
-        ''', (slug, title, author, lang, status, '[]', ext, str(source_path.relative_to(ROOT)), notes, datetime.now().isoformat()))
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    if book is None:
+        book = Book(
+            slug=slug,
+            title=title,
+            author=author,
+            lang=lang,
+            status=status,
+            tags='[]',
+            source_format=ext,
+            source_path=str(source_path.relative_to(config.ROOT)),
+            notes=notes,
+            added_at=datetime.now().isoformat(),
+        )
+        session.add(book)
+    else:
+        book.title = title
+        book.author = author
+        book.updated_at = datetime.now().isoformat()
+    session.commit()
 
-    # Trigger analysis (async or sync?)
-    # For MVP, sync (simple)
+    # Trigger analysis (MVP: sync)
     analyze_book(slug)
+    session.close()
 
-    return jsonify({'status': 'ok', 'slug': slug, 'message': f'Book {slug} uploaded and queued for analysis'})
+    return jsonify({'status': 'ok', 'slug': slug, 'message': f'Book {slug} uploaded'})
 
 
 @app.route('/api/status/<slug>', methods=['PUT'])
@@ -168,12 +208,29 @@ def api_update_status(slug):
     rating = data.get('rating')
     if new_status not in ('to-read', 'reading', 'completed', 'paused', 'dropped'):
         return jsonify({'error': 'invalid status'}), 400
-    with get_db() as conn:
-        if rating is not None:
-            conn.execute('UPDATE books SET status=?, rating=?, updated_at=datetime(\'now\') WHERE slug=?', (new_status, rating, slug))
-        else:
-            conn.execute('UPDATE books SET status=?, updated_at=datetime(\'now\') WHERE slug=?', (new_status, slug))
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    if not book:
+        return jsonify({'error': 'not found'}), 404
+    book.status = new_status
+    if rating is not None:
+        book.rating = rating
+    book.updated_at = datetime.now().isoformat()
+    session.commit()
+    session.close()
     return jsonify({'status': 'ok'})
+
+
+@app.route('/api/config')
+def api_config():
+    """Expose non-sensitive config (for frontend)."""
+    return jsonify({
+        'language': config.LANGUAGE,
+        'default_lang': config.LANGUAGE,
+        'supported_languages': config.SUPPORTED_LANGUAGES,
+        'hermes_enabled': config.HERMES_ENABLED,
+        'vault_dir': str(config.VAULT_DIR),
+    })
 
 
 @app.route('/health')
@@ -190,25 +247,32 @@ def make_slug(title, author):
     return s.strip('-')
 
 
-def get_all_books_with_vault_status():
-    """Read books from DB, merge with vault frontmatter if available."""
+def get_all_books():
+    """Read all books from DB."""
+    session = get_session()
     books = []
-    with get_db() as conn:
-        rows = conn.execute('SELECT * FROM books ORDER BY title').fetchall()
-    for row in rows:
-        b = dict(row)
-        # Try to get cover/icon from vault (if synced)
-        # TODO: pull from vault frontmatter
-        books.append(b)
+    for b in session.query(Book).order_by(Book.title).all():
+        books.append({
+            'slug': b.slug,
+            'title': b.title,
+            'author': b.author,
+            'lang': b.lang,
+            'status': b.status,
+            'rating': b.rating or 0,
+            'year': b.year,
+            'tags': json.loads(b.tags) if b.tags else [],
+            'added_at': b.added_at,
+            'notes': b.notes,
+        })
+    session.close()
     return books
 
 
 def analyze_book(slug):
     """
     Convert source file → TXT, extract chapters, render HTML.
-    Uses scripts from analyzer/.
     """
-    book_dir = BOOKS_DIR / slug
+    book_dir = config.BOOKS_DIR / slug
     source_path = next(iter(book_dir.glob('source.*')), None)
     if not source_path:
         return False
@@ -218,7 +282,6 @@ def analyze_book(slug):
     # Step 1: convert to TXT
     txt_path = book_dir / 'source.txt'
     if ext == 'txt':
-        # already text
         import shutil
         shutil.copy(source_path, txt_path)
     elif ext == 'epub':
@@ -229,21 +292,30 @@ def analyze_book(slug):
 
     # Step 2: extract chapters + render HTML
     # TODO: implement chapter extraction
-    # For now, placeholder
-    gen_dir = GENERATED_DIR / slug
+    gen_dir = config.GENERATED_DIR / slug
     gen_dir.mkdir(parents=True, exist_ok=True)
     (gen_dir / 'README.txt').write_text(f"Analysis pending for {slug}. Source: {txt_path}")
 
     # Update DB
-    with get_db() as conn:
-        conn.execute('UPDATE books SET last_analyzed=datetime(\'now\') WHERE slug=?', (slug,))
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    if book:
+        book.last_analyzed = datetime.now().isoformat()
+        book.updated_at = datetime.now().isoformat()
+        session.commit()
+    session.close()
     return True
 
 
 # ============ Main ============
 if __name__ == '__main__':
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    BOOKS_DIR.mkdir(parents=True, exist_ok=True)
-    GENERATED_DIR.mkdir(parents=True, exist_ok=True)
-    init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    config.BOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    config.GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+    config.COVERS_DIR.mkdir(parents=True, exist_ok=True)
+    config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    warnings = config.validate()
+    if warnings:
+        print("Config warnings:")
+        for w in warnings:
+            print(f"  - {w}")
+    app.run(debug=True, host='0.0.0.0', port=config.DEFAULT_PORT)
