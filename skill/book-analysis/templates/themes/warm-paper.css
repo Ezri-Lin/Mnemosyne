@@ -1,30 +1,100 @@
-/* ============================================================
-   暖纸典藏（warm-paper · 默认主题）
-   与 base.html :root 默认值完全一致——此文件是其显式拷贝，
-   保证菜单 4 项对称、可读、可独立覆盖。
-   ============================================================ */
+/* Warm-paper theme — canonical CSS for book analysis pages */
+/* Variables — must be identical across all generated books */
 :root {
-  --ink: #171411;
-  --muted: #6d6258;
-  --paper: #f8f2e7;
-  --paper-deep: #ece1cf;
-  --line: #d8c8af;
-  --red: #b9422f;
-  --blue: #245f73;
-  --green: #4d6f48;
-  --gold: #c2872d;
-  --white: #fffaf0;
-  --shadow: 0 18px 50px rgba(55, 38, 19, .14);
+  --ink: #171411; --muted: #6d6258; --paper: #f8f2e7; --paper-deep: #ece1cf;
+  --line: #d8c8af; --red: #b9422f; --blue: #245f73; --green: #4d6f48; --gold: #c2872d;
+  --white: #fffaf0; --shadow: 0 18px 50px rgba(55,38,19,.14);
+  --font-body: "Songti SC","Noto Serif CJK SC",Georgia,serif;
+  --font-display: "PingFang SC","Microsoft YaHei",sans-serif;
+  --bg: radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%);
+  --surface: rgba(255,250,240,.62); --surface-strong: rgba(255,250,240,.72);
+  --bar-bg: rgba(248,242,231,.95);
+  --ink-soft: #3d332b; --ink-soft-2: #44392f;
+  --tint-accent: rgba(194,135,45,.12); --tint-accent-strong: rgba(194,135,45,.15);
+  --must: #b9422f; --should: #c2872d; --skip: #6d6258;
+}
+* { box-sizing: border-box; }
+body { margin:0; color:var(--ink); background:var(--bg); font-family:var(--font-body); }
+button { font:inherit; color:inherit; }
+a { color:inherit; text-decoration:none; }
 
-  --font-body: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
-  --font-display: "PingFang SC", "Microsoft YaHei", sans-serif;
-  --bg: radial-gradient(circle at 22% 12%, rgba(194, 135, 45, .18), transparent 28rem),
-        linear-gradient(135deg, #fbf6ec 0%, #efe1ca 100%);
-  --surface: rgba(255, 250, 240, .62);
-  --surface-strong: rgba(255, 250, 240, .72);
-  --bar-bg: rgba(248, 242, 231, .95);
-  --ink-soft: #3d332b;
-  --ink-soft-2: #44392f;
-  --tint-accent: rgba(194, 135, 45, .12);
-  --tint-accent-strong: rgba(194, 135, 45, .15);
+/* Layout */
+.page { width:min(1180px,calc(100% - 32px)); margin:0 auto; padding:32px 0 44px; isolation:isolate; }
+.section-title { margin:8px 0 14px; font:900 28px/1.15 var(--font-display); }
+.section-lead { margin:0 0 18px; color:var(--ink-soft); font-size:17px; line-height:1.7; }
+
+/* Hero */
+.hero { min-height:30vh; display:grid; grid-template-columns:1.15fr .85fr; gap:32px; align-items:end; padding:24px 0 24px; }
+.eyebrow { margin:0 0 14px; color:var(--red); font:700 13px/1.3 var(--font-display); letter-spacing:.05em; }
+h1 { margin:0; max-width:760px; font-size:clamp(36px,6vw,68px); line-height:1.0; font-weight:900; }
+.hero .lede { margin:18px 0 0; max-width:720px; color:var(--ink-soft); font-size:18px; line-height:1.7; }
+.thesis { border-left:7px solid var(--red); background:var(--surface-strong); padding:20px 22px; box-shadow:var(--shadow); }
+.thesis strong { display:block; margin-bottom:8px; font:800 16px/1.2 var(--font-display); color:var(--red); }
+.thesis span { display:block; color:var(--ink-soft-2); font-size:16px; line-height:1.7; }
+
+/* Nav bar */
+.nav-bar { position:sticky; top:0; z-index:50; padding:10px 0; margin-bottom:14px; border-bottom:1px solid var(--line); background:var(--bar-bg); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.nav-bar .nav-label { font:700 12px/1.4 var(--font-display); color:var(--muted); margin-right:6px; }
+.nav-bar a { display:inline-block; padding:6px 12px; border:1px solid var(--line); background:var(--white); font:700 12px/1.4 var(--font-display); color:var(--ink); border-radius:3px; }
+.nav-bar a:hover { background:var(--ink); color:var(--white); border-color:var(--ink); }
+.nav-bar a.active { background:var(--red); color:var(--white); border-color:var(--red); }
+
+/* Cluster cards (full-width sections) */
+.cluster { margin-bottom:14px; padding:16px 18px; border:1px solid var(--line); background:var(--surface); position:relative; }
+.cluster-label { display:inline-block; padding:3px 10px; background:var(--red); color:var(--white); font:800 12px/1.4 var(--font-display); letter-spacing:.04em; margin-bottom:10px; }
+.cluster-why { color:var(--ink-soft); font-size:15px; line-height:1.65; margin:0 0 12px; font-style:italic; }
+.cluster-ch { display:grid; grid-template-columns:50px 1fr auto; gap:10px 14px; padding:8px 0; border-top:1px dashed var(--line); align-items:baseline; }
+.cluster-ch:first-of-type { border-top:0; }
+.cluster-ch .ch-num { color:var(--red); font:900 17px/1.2 var(--font-display); }
+.cluster-ch .ch-info { display:grid; gap:3px; }
+.cluster-ch .ch-title-en { font:800 15px/1.3 var(--font-display); color:var(--ink); }
+.cluster-ch .ch-title-zh { font:13px/1.5 var(--font-display); color:var(--muted); }
+.cluster-ch .ch-reason-en { font-size:14px; line-height:1.55; color:var(--ink-soft-2); margin-top:4px; }
+.cluster-ch .ch-reason-zh { font-size:13px; line-height:1.55; color:var(--ink-soft); margin-top:3px; }
+.cluster-ch .detail-link { display:inline-block; padding:5px 12px; background:var(--ink); color:var(--white); font:700 11px/1.4 var(--font-display); border-radius:3px; white-space:nowrap; }
+.cluster-ch .detail-link:hover { background:var(--red); }
+
+/* Heatmap */
+.heatmap { display:grid; grid-template-columns:repeat(11,1fr); gap:4px; margin:14px 0; }
+.heatmap-cell { aspect-ratio:1.4/1; padding:6px 4px; border:1px solid var(--line); cursor:pointer; transition:transform .15s; position:relative; display:flex; flex-direction:column; justify-content:space-between; align-items:center; font-family:var(--font-display); text-decoration:none; }
+.heatmap-cell:hover { transform:scale(1.08); z-index:2; box-shadow:var(--shadow); }
+.heatmap-cell.must { background:var(--must); color:var(--white); border-color:var(--must); }
+.heatmap-cell.should { background:var(--should); color:var(--white); border-color:var(--should); }
+.heatmap-cell.skip { background:var(--paper-deep); color:var(--ink-soft); border-color:var(--line); }
+.heatmap-cell .hm-num { font:900 13px/1; }
+.heatmap-cell .hm-status { font:700 10px/1; padding:1px 4px; border:1px solid currentColor; border-radius:2px; margin-top:1px; }
+.heatmap-cell.has-detail::after { content:"●"; position:absolute; top:3px; right:5px; font-size:8px; color:var(--gold); text-shadow:0 0 2px var(--ink); }
+.heatmap-legend { display:flex; gap:14px; margin:10px 0 18px; font-size:13px; color:var(--ink-soft); flex-wrap:wrap; }
+.heatmap-legend .lg { display:inline-flex; align-items:center; gap:5px; }
+.heatmap-legend .sw { display:inline-block; width:14px; height:14px; border:1px solid var(--line); }
+
+/* Concept rows */
+.concept-row { padding:14px 16px; border:1px solid var(--line); background:var(--surface); margin-bottom:8px; }
+.concept-row .cname { font:900 17px/1.3 var(--font-display); color:var(--ink); margin-bottom:4px; }
+.concept-row .cquestion { font-size:14px; line-height:1.55; color:var(--ink-soft); font-style:italic; }
+.concept-row .cchapters { font-size:12px; color:var(--muted); margin-top:6px; }
+.concept-row .cchapters .pill { display:inline-block; padding:1px 7px; background:var(--paper-deep); border:1px solid var(--line); margin-right:4px; font:700 11px/1.6 var(--font-display); }
+
+/* Matrix table */
+table.matrix { width:100%; border-collapse:collapse; font:15px/1.5 var(--font-body); margin:18px 0; }
+.matrix th,.matrix td { padding:10px 8px; border:1px solid var(--line); text-align:left; }
+.matrix th { background:var(--surface-strong); font:800 13px/1.3 var(--font-display); }
+.matrix td:first-child { font-weight:700; }
+.matrix td .has-detail-cell { color:var(--red); font-weight:700; }
+
+/* Footer */
+.footer { margin-top:30px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font:13px/1.7 var(--font-display); }
+
+/* Chinese details toggle */
+details.zh { margin:8px 0; padding:8px 12px; background:var(--tint-accent); border-left:3px solid var(--gold); }
+details.zh summary { cursor:pointer; font:700 12px/1.5 var(--font-display); color:var(--ink-soft); list-style:none; }
+details.zh summary::before { content:"中 ▾ "; color:var(--gold); font-weight:900; }
+details.zh[open] summary::before { content:"中 ▴ "; }
+details.zh p { margin:6px 0 0; font-size:13px; line-height:1.7; color:var(--ink-soft); }
+
+/* Responsive */
+@media (max-width:880px) {
+  .hero { grid-template-columns:1fr; }
+  .heatmap { grid-template-columns:repeat(6,1fr); }
+  .nav-bar { flex-direction:column; align-items:flex-start; }
 }
