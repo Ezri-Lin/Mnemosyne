@@ -1,0 +1,40 @@
+# Runtime data (never in git)
+data/books/
+data/generated/
+data/covers/
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.local
+*.pem
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
