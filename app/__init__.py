@@ -105,6 +105,14 @@ def get_session():
     return SessionLocal()
 
 
+# ============ No-Cache ============
+@app.after_request
+def add_no_cache(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # ============ Routes ============
 
 @app.route('/')
@@ -112,6 +120,10 @@ def poster_wall():
     """Main page - poster wall."""
     return render_template('poster-wall.html', books=get_all_books())
 
+
+@app.route('/covers/<path:filename>')
+def serve_cover(filename):
+    return send_from_directory(config.COVERS_DIR, filename)
 
 @app.route('/book/<slug>/')
 def book_page(slug):
@@ -363,6 +375,10 @@ def get_all_books():
             chapters_dir = os.path.join(full_path, 'web', 'chapters')
             if os.path.exists(web_index) or (os.path.isdir(chapters_dir) and os.listdir(chapters_dir)):
                 parse_status = 'parsed'
+        # Check if cover image exists
+        cover_file = config.COVERS_DIR / f"{b.slug}.jpg"
+        has_cover = cover_file.exists()
+        
         books.append({
             'slug': b.slug,
             'title': b.title,
@@ -375,6 +391,7 @@ def get_all_books():
             'added_at': b.added_at,
             'notes': b.notes,
             'parse_status': parse_status,
+            'has_cover': has_cover,
         })
     session.close()
     return books
@@ -411,19 +428,55 @@ def extract_epub_metadata(filepath):
                 elif name_lower == 'language':
                     metadata['lang'] = value_str[:2].lower()
 
-        # Cover: look for meta name="cover" in OPF items
+        # Cover: multiple strategies
         try:
             from bs4 import BeautifulSoup
+            cover_id = None
+            
+            # Strategy 1: <meta name="cover" content="..."/>
             for item in book.get_items_of_type(9):  # ITEM_DOCUMENT
                 soup = BeautifulSoup(item.get_body_content(), 'xml')
                 meta = soup.find('meta', {'name': 'cover'})
                 if meta and meta.get('content'):
-                    cover_item = book.get_item_with_id(meta['content'])
-                    if cover_item:
-                        cover_path = Path(filepath).parent / 'cover.jpg'
-                        cover_path.write_bytes(cover_item.get_content())
-                        metadata['cover_path'] = str(cover_path)
+                    cover_id = meta['content']
                     break
+            
+            # Strategy 2: EPUB3 manifest item with properties="cover-image"
+            if not cover_id:
+                for item in book.get_items_of_type(9):
+                    soup = BeautifulSoup(item.get_body_content(), 'xml')
+                    manifest = soup.find('manifest') or soup.find('opf:manifest')
+                    if manifest:
+                        for el in manifest.find_all(['item', 'opf:item']):
+                            props = el.get('properties', '')
+                            if 'cover-image' in props:
+                                cover_id = el.get('id')
+                                break
+                    if cover_id:
+                        break
+            
+            # Strategy 3: item id contains "cover"
+            if not cover_id:
+                for item in book.get_items():
+                    if 'cover' in (item.get_name() or '').lower():
+                        cover_id = item.get_id()
+                        break
+            
+            if cover_id:
+                cover_item = book.get_item_with_id(cover_id)
+                if cover_item:
+                    cover_path = Path(filepath).parent / 'cover.jpg'
+                    cover_path.write_bytes(cover_item.get_content())
+                    metadata['cover_path'] = str(cover_path)
+
+            # Strategy 4: fallback to first image
+            if not cover_id:
+                for item in book.get_items():
+                    if item.get_type() == 1:  # ITEM_IMAGE
+                        cover_path = Path(filepath).parent / 'cover.jpg'
+                        cover_path.write_bytes(item.get_content())
+                        metadata['cover_path'] = str(cover_path)
+                        break
         except Exception:
             pass
 

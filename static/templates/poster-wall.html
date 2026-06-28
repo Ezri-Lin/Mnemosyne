@@ -307,6 +307,7 @@ function enrichBook(b) {
   b.tags = b.tags || [];
   b.added_at = b.added_at || "2026-01-01";
   b.rating = b.rating || 0;
+  b.cover_url = b.has_cover ? ("/covers/" + b.slug + ".jpg") : null;
   return b;
 }
 var books = {{ books | tojson | safe }}.map(enrichBook);
@@ -372,8 +373,8 @@ function renderCards() {
       'data-search="' + esc((b.title + " " + b.author + " " + (b.tags||[]).join(" ")).toLowerCase()) + '" ' +
       'href="' + href + '">' +
       '<div class="poster-cover">' +
-        '<div class="cover-art" style="background:' + b.cover_style + ';">' +
-          '<div class="cover-icon">' + esc(b.icon) + '</div>' +
+        '<div class="cover-art" style="' + (b.cover_url ? ('background-image:url(' + b.cover_url + ');background-size:cover;background-position:center;') : ('background:' + b.cover_style)) + ';">' +
+          (b.cover_url ? '' : ('<div class="cover-icon">' + esc(b.icon) + '</div>')) +
           '<div class="cover-year">' + b.year + '</div>' +
           '<div>' +
             '<h3 class="cover-title">' + esc(b.title) + '</h3>' +
