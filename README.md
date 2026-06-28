@@ -51,16 +51,54 @@ web/
   Existing generated or hand-tested HTML artifacts
 ```
 
-## Install The Skill
+## Quick Install
 
-For Codex local testing:
+From a local checkout:
+
+```bash
+./scripts/install-book-analyst
+```
+
+Or install directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ezri-Lin/Mnemosyne/main/scripts/install-book-analyst | bash
+```
+
+The installer copies the complete `skill/book-analyst/` package into the local skill directory, including scripts, page templates, references, and JSON skeletons.
+
+Default install target:
+
+```text
+${CODEX_HOME:-$HOME/.codex}/skills/book-analyst
+```
+
+For other agents, pass that agent's skill directory:
+
+```bash
+./scripts/install-book-analyst --skills-dir /path/to/agent/skills
+```
+
+After installing, restart the AI Agent and say:
+
+```text
+Use $book-analyst to configure my book library, analyze this book,
+and generate the Library, Book Home, and Chapter Page outputs.
+```
+
+The installer prints this activation prompt after a successful install.
+
+## Manual Install
+
+If you prefer to copy files yourself:
 
 ```bash
 mkdir -p ~/.codex/skills
+rm -rf ~/.codex/skills/book-analyst
 cp -R skill/book-analyst ~/.codex/skills/book-analyst
 ```
 
-For other agents, copy `skill/book-analyst/` into that agent's skill or workflow directory and invoke it as `book-analyst`.
+Then restart the AI Agent and invoke `book-analyst`.
 
 Example prompt:
 

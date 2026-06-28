@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_URL="${MNEMOSYNE_REPO_URL:-https://github.com/Ezri-Lin/Mnemosyne.git}"
+REF="${MNEMOSYNE_REF:-main}"
+SKILLS_DIR="${BOOK_ANALYST_SKILLS_DIR:-${CODEX_HOME:-$HOME/.codex}/skills}"
+SOURCE=""
+TMP_ROOT=""
+
+usage() {
+  cat <<'EOF'
+Install the book-analyst skill locally.
+
+Usage:
+  scripts/install-book-analyst [options]
+
+Options:
+  --skills-dir PATH   Skill install root. Default: ${CODEX_HOME:-$HOME/.codex}/skills
+  --source PATH       Local skill folder or repository root. Default: auto-detect
+  --repo-url URL      Git repository for curl/remote installs.
+  --ref REF           Git branch/tag/ref for remote installs. Default: main
+  -h, --help          Show this help.
+
+Examples:
+  ./scripts/install-book-analyst
+  ./scripts/install-book-analyst --skills-dir ~/.codex/skills
+  curl -fsSL https://raw.githubusercontent.com/Ezri-Lin/Mnemosyne/main/scripts/install-book-analyst | bash
+EOF
+}
+
+die() {
+  printf 'install-book-analyst: %s\n' "$*" >&2
+  exit 1
+}
+
+cleanup() {
+  if [[ -n "$TMP_ROOT" && -d "$TMP_ROOT" ]]; then
+    rm -rf "$TMP_ROOT"
+  fi
+}
+trap cleanup EXIT
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skills-dir)
+      [[ $# -ge 2 ]] || die "--skills-dir requires a path"
+      SKILLS_DIR="$2"
+      shift 2
+      ;;
+    --source)
+      [[ $# -ge 2 ]] || die "--source requires a path"
+      SOURCE="$2"
+      shift 2
+      ;;
+    --repo-url)
+      [[ $# -ge 2 ]] || die "--repo-url requires a URL"
+      REPO_URL="$2"
+      shift 2
+      ;;
+    --ref)
+      [[ $# -ge 2 ]] || die "--ref requires a branch, tag, or ref"
+      REF="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown option: $1"
+      ;;
+  esac
+done
+
+skill_from_path() {
+  local candidate="$1"
+  if [[ -f "$candidate/SKILL.md" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  if [[ -f "$candidate/skill/book-analyst/SKILL.md" ]]; then
+    printf '%s\n' "$candidate/skill/book-analyst"
+    return 0
+  fi
+  return 1
+}
+
+download_source() {
+  TMP_ROOT="$(mktemp -d)"
+  if command -v git >/dev/null 2>&1; then
+    git clone --depth 1 --branch "$REF" "$REPO_URL" "$TMP_ROOT/repo" >/dev/null 2>&1 \
+      || die "failed to clone $REPO_URL at $REF"
+    skill_from_path "$TMP_ROOT/repo" || die "downloaded repository has no skill/book-analyst"
+    return 0
+  fi
+
+  command -v curl >/dev/null 2>&1 || die "remote install needs git or curl"
+  command -v tar >/dev/null 2>&1 || die "remote install needs tar"
+
+  local archive_url="https://github.com/Ezri-Lin/Mnemosyne/archive/refs/heads/${REF}.tar.gz"
+  curl -fsSL "$archive_url" | tar -xz -C "$TMP_ROOT"
+  local extracted
+  extracted="$(find "$TMP_ROOT" -maxdepth 1 -type d -name 'Mnemosyne-*' | head -n 1)"
+  [[ -n "$extracted" ]] || die "failed to extract Mnemosyne archive"
+  skill_from_path "$extracted" || die "downloaded archive has no skill/book-analyst"
+}
+
+resolve_source() {
+  if [[ -n "$SOURCE" ]]; then
+    skill_from_path "$SOURCE" || die "--source must point to skill/book-analyst or the repository root"
+    return 0
+  fi
+
+  local script_dir=""
+  local script_path="${BASH_SOURCE[0]:-$0}"
+  if [[ -n "$script_path" && -e "$script_path" ]]; then
+    script_dir="$(cd "$(dirname "$script_path")" >/dev/null 2>&1 && pwd || true)"
+  fi
+
+  if [[ -n "$script_dir" ]] && skill_from_path "$script_dir/.." >/dev/null 2>&1; then
+    skill_from_path "$script_dir/.."
+    return 0
+  fi
+
+  if skill_from_path "$PWD" >/dev/null 2>&1; then
+    skill_from_path "$PWD"
+    return 0
+  fi
+
+  download_source
+}
+
+SOURCE_DIR="$(resolve_source)"
+DEST_DIR="$SKILLS_DIR/book-analyst"
+
+mkdir -p "$SKILLS_DIR"
+INSTALL_TMP="$(mktemp -d "$SKILLS_DIR/.book-analyst.XXXXXX")"
+cp -R "$SOURCE_DIR" "$INSTALL_TMP/book-analyst"
+rm -rf "$DEST_DIR"
+mv "$INSTALL_TMP/book-analyst" "$DEST_DIR"
+rmdir "$INSTALL_TMP"
+
+if [[ -d "$DEST_DIR/scripts" ]]; then
+  find "$DEST_DIR/scripts" -type f -name '*.py' -exec chmod +x {} \;
+fi
+
+cat <<EOF
+Book Analyst installed.
+
+Skill:
+  $DEST_DIR
+
+Restart your AI Agent, then say:
+  Use \$book-analyst to configure my book library, analyze this book, and generate the Library, Book Home, and Chapter Page outputs.
+
+Initialize a book project anytime with:
+  python "$DEST_DIR/scripts/init_project.py" --project-root .
+EOF
