@@ -609,14 +609,44 @@ document.getElementById("uploadForm").onsubmit = function(e) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.status === "ok") {
-        showToast("✓ Added. Metadata auto-extracted. Refresh to see it on the wall.");
         closeUploadModal();
+        showToast("✓ Added: " + d.slug);
+        refreshBooks();
       } else {
         showToast("✗ Error: " + (d.error || "unknown"));
       }
     })
     .catch(function() { showToast("✗ Upload failed. Try again."); });
 };
+
+// ====== Auto-refresh after upload ======
+function refreshBooks() {
+  fetch("/api/books")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Apply the same enrichments as initial load
+      books = data.map(function(b) {
+        var words = (b.title || "").split(/[\s·]+/).filter(function(w) { return w.length > 0; });
+        b.icon = words.slice(0, 2).map(function(w) { return w.charAt(0).toUpperCase(); }).join("");
+        b.cover_style = palettes[Math.abs(hash(b.slug || b.title)) % palettes.length];
+        b.tags = b.tags || [];
+        b.added_at = b.added_at || "2026-01-01";
+        b.rating = b.rating || 0;
+        return b;
+      });
+      // Update stats
+      renderStats();
+      // Replace cards
+      var grid = document.getElementById("posterGrid");
+      var oldCards = grid.querySelectorAll(".poster-card");
+      for (var i = 0; i < oldCards.length; i++) oldCards[i].remove();
+      renderCards();
+      applySort();
+      applyFilters();
+      showToast("✓ Refreshed");
+    })
+    .catch(function() { showToast("✗ Failed to refresh. Please reload."); });
+}
 
 // ====== Init ======
 renderStats();
