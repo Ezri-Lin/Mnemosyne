@@ -7,9 +7,9 @@ Mnemosyne — display layer for book analysis.
 - /api/status    → GET/PUT book status
 - /health        → liveness probe
 
-NOTE: AI analysis no longer happens here. All analysis is done by Hermes Agent
-in chat sessions (see book-analysis skill). Mnemosyne only stores, displays,
-and serves the results.
+NOTE: AI analysis no longer happens here. All analysis is done by an AI Agent
+that can load the book-analyst skill. Mnemosyne only stores, displays, and
+serves the results.
 """
 
 import os

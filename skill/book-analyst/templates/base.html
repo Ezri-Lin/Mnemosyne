@@ -965,7 +965,7 @@
         var prompt = "对《" + bookName + "》中「" + concept + "」，深入追问：" + q + "。\n\n请用 book-to-webpage skill 生成一个交互 HTML 页面来回答这个问题。知识库路径：" + document.title + "，出处：" + currentRef;
         navigator.clipboard.writeText(prompt).then(function() {
           overlay.classList.remove("active");
-          showToast("追问 prompt 已复制，贴回 Claude 对话即可");
+          showToast("追问 prompt 已复制，贴回你的 AI Agent 对话即可");
         }).catch(function() {
           showToast("复制失败，请手动复制：" + prompt.substring(0, 60) + "...");
         });

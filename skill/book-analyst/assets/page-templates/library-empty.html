@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Analyst Library</title>
+<style>
+:root {
+  --ink:#171411; --muted:#6d6258; --paper:#f8f2e7; --paper-deep:#ece1cf;
+  --line:#d8c8af; --red:#b9422f; --blue:#245f73; --green:#4d6f48; --gold:#c2872d;
+  --white:#fffaf0; --surface:rgba(255,250,240,.68); --surface-strong:rgba(255,250,240,.78);
+  --font-body:"Songti SC","Noto Serif CJK SC",Georgia,serif;
+  --font-display:"PingFang SC","Microsoft YaHei",sans-serif;
+  --bg:radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%);
+}
+*{box-sizing:border-box} body{margin:0;color:var(--ink);background:var(--bg);font-family:var(--font-body)}
+button,input,select{font:inherit;color:inherit}.page{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:28px 0 40px}
+.header{display:flex;justify-content:space-between;gap:16px;align-items:end;margin-bottom:18px}.header h1{margin:0;font:900 clamp(32px,5vw,58px)/1 var(--font-display)}
+.header p{margin:10px 0 0;color:var(--muted);font-size:16px;line-height:1.6}.upload{border:1px dashed var(--line);background:var(--surface);padding:12px 16px;border-radius:6px;cursor:pointer;font:800 13px/1.3 var(--font-display)}
+.toolbar{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;margin:16px 0}.toolbar input,.toolbar select{border:1px solid var(--line);background:var(--white);padding:9px 10px;border-radius:5px;font:13px/1.3 var(--font-display)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}.book{display:block;color:inherit;text-decoration:none}.cover{aspect-ratio:2/3;border:1px solid var(--line);background:var(--surface-strong);padding:16px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 26px rgba(55,38,19,.12)}
+.cover-title{font:900 18px/1.2 var(--font-display)}.cover-author{color:var(--muted);font:700 12px/1.4 var(--font-display)}.meta{margin-top:7px;color:var(--muted);font:12px/1.4 var(--font-display)}
+.empty{border:1px solid var(--line);background:var(--surface);padding:28px;text-align:center;color:var(--muted);font:15px/1.7 var(--font-display)}
+@media(max-width:760px){.header,.toolbar{grid-template-columns:1fr;display:grid}.upload{width:100%}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="header">
+    <div>
+      <h1>Book Analyst Library</h1>
+      <p>Many books live here. Individual book analysis starts after opening a Book Home page.</p>
+    </div>
+    <button class="upload" type="button" data-action="upload">+ Add Book</button>
+  </header>
+
+  <section class="toolbar" aria-label="Library filters">
+    <input id="search" type="search" placeholder="Search books">
+    <select id="status"><option value="all">All status</option><option value="reading">Reading</option><option value="to-read">To read</option><option value="completed">Completed</option></select>
+    <select id="parse"><option value="all">All parse states</option><option value="parsed">Parsed</option><option value="not-parsed">Not parsed</option></select>
+    <select id="sort"><option value="recent">Recently added</option><option value="title">Title</option></select>
+  </section>
+
+  <section class="grid" id="bookGrid"></section>
+  <section class="empty" id="emptyState" hidden>No books installed yet. Upload a book or point the skill config to your source directory.</section>
+</main>
+
+<script type="application/json" id="books-data">{{BOOKS_JSON}}</script>
+<script>
+function readJson(id, fallback){
+  var el=document.getElementById(id);
+  if(!el) return fallback;
+  var raw=el.textContent.trim();
+  if(!raw || raw.indexOf("{{")>=0) return fallback;
+  try{return JSON.parse(raw);}catch(e){return fallback;}
+}
+var books=readJson("books-data",[]);
+var grid=document.getElementById("bookGrid");
+var empty=document.getElementById("emptyState");
+function render(){
+  var q=(document.getElementById("search").value||"").toLowerCase();
+  var status=document.getElementById("status").value;
+  var parse=document.getElementById("parse").value;
+  var sort=document.getElementById("sort").value;
+  var list=books.filter(function(b){
+    var text=((b.title||"")+" "+(b.author||"")).toLowerCase();
+    return (!q || text.indexOf(q)>=0) && (status==="all" || b.status===status) && (parse==="all" || b.parse_status===parse);
+  });
+  if(sort==="title") list.sort(function(a,b){return String(a.title||"").localeCompare(String(b.title||""));});
+  else list.sort(function(a,b){return String(b.added_at||"").localeCompare(String(a.added_at||""));});
+  grid.innerHTML=list.map(function(b){
+    var href=b.detail_url || ("book/"+encodeURIComponent(b.slug||"")+"/");
+    return '<a class="book" href="'+href+'"><article class="cover"><div><div class="cover-title">'+escapeHtml(b.title||"Untitled")+'</div><div class="cover-author">'+escapeHtml(b.author||"")+'</div></div><div class="meta">'+escapeHtml(b.status||"to-read")+' · '+escapeHtml(b.parse_status||"not-parsed")+'</div></article></a>';
+  }).join("");
+  empty.hidden=list.length!==0;
+}
+function escapeHtml(v){return String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+["search","status","parse","sort"].forEach(function(id){document.getElementById(id).oninput=render;});
+render();
+</script>
+</body>
+</html>

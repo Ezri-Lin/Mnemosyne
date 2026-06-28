@@ -1,82 +1,148 @@
 # Mnemosyne
 
-> **The Mother of Memory** · 你的个人阅读伴侣。
-> Mnemosyne（希腊语：Μνημοσύνη）是记忆女神，九位缪斯之母。
-> 展示经 AI 分析后的书籍架构页面 + 章节详情。
+> AI Book Analyst for visual reading maps, chapter guides, and reusable knowledge skills.
 
-## 架构
+Mnemosyne is the product and display layer. It stores books, shows a Library, and serves the generated Book Home and Chapter Page artifacts.
 
-```
-Mnemosyne 是纯展示层。AI 分析由 Hermes Agent 在聊天中完成。
+The installable workflow is the **`book-analyst` skill**. It is intentionally agent-agnostic: Codex, Claude Code, Hermes, OpenClaw, WorkBuddy, or any AI assistant that can load skills/workflows can use the same methodology.
 
-📚 上传（Mnemosyne Web 或直接放入 vault）
-   ↓
-🧠 *Hermes Agent 分析*（在 Hermes 聊天中，按 book-analysis skill 方法论）
-   · Phase 1: God's-eye View（论题 + 论证树 + 水分标注）
-   · Phase 2: 章节分级（价值密度 × 个人推荐）
-   · Phase 3: 生成 HTML（索引页 + 章节详情页）
-   · Phase 4: 对话深读（可选）
-   ↓
-🖼️ Mnemosyne 展示（书架 + 架构页 + 章节详情页）
-   ↓
-📝 笔记同步至 Obsidian vault（Golden-House）
-```
+## What This Is
 
-## 核心方法论：`skill/book-analysis/`
+Mnemosyne is not a normal summary app. The goal is to let an AI Agent read like a teacher preparing a lesson:
 
-```
-skill/book-analysis/
-├── SKILL.md                        ← 完整工作流（Hermes 可加载）
-├── references/
-│   ├── the-body-keeps-the-score-reference.md  ← 标杆产出参考
-│   └── html-patterns.md            ← 14 个 HTML 输出范式
-└── templates/
-    ├── base.html                   ← 页面骨架（暖纸主题）
-    ├── components.md               ← 12 个交互组件
-    └── themes/
-        └── warm-paper.css          ← 默认主题 CSS
+1. split the book into manageable chapters
+2. identify high-value chapters instead of reading everything into one context
+3. build themes, concepts, evidence chains, quotes, and reading routes
+4. render a visual navigation system before the user starts deep reading
+5. keep Markdown/JSON outputs usable for Obsidian, Git, static hosting, or future knowledge skills
+
+The result is a three-layer reading artifact:
+
+```text
+Library
+  Many books, upload/status/search/sort/filter.
+
+Book Home
+  One book's god's-eye map: thesis, themes, chapter heatmap, concept network,
+  evidence links, frameworks, and recommended reading route.
+
+Chapter Page
+  One important chapter's detailed guide: role, argument chain, frameworks,
+  cases, research, decisions, source evidence, and AI understanding.
 ```
 
-使用方式：
-1. 确保 `book-to-webpage` skill 已安装至 `~/.hermes/skills/`
-2. 在 Hermes Agent 聊天中：
-   ```
-   分析《书名》，加载 book-analysis skill
-   ```
-3. Agent 会自动读完文本、按 4-Phase 方法论分析、生成 HTML + vault 笔记
+## Repository Layout
 
-## 技术栈
+```text
+skill/book-analyst/
+  SKILL.md                         # workflow entry for AI Agents
+  agents/openai.yaml               # optional agent metadata
+  assets/page-templates/           # empty Library / Book Home / Chapter shells
+  assets/data-skeletons/           # JSON skeletons for analysis output
+  references/                      # workflow, schema, template contract
+  scripts/                         # init, extract, split, render, serve, validate
+  templates/                       # existing HTML component references
 
-- **后端**: Flask + SQLAlchemy + SQLite
-- **前端**: 纯 HTML/CSS/JS（暖纸主题）
-- **展示**: Poster Wall + Architecture 页 + Chapter 详情页
-- **部署**: Docker（单容器）
+docs/
+  BOOK_ANALYST_SYSTEM_SPEC.md      # business rules and page responsibilities
+  BOOK_ANALYST_TEMPLATE_CONTRACT.md# template/data/backend contract
 
-## 快速启动
+web/
+  Existing generated or hand-tested HTML artifacts
+```
+
+## Install The Skill
+
+For Codex local testing:
 
 ```bash
-cp .env.example .env   # 配置 vault 路径
-docker compose up -d   # 启动
+mkdir -p ~/.codex/skills
+cp -R skill/book-analyst ~/.codex/skills/book-analyst
 ```
 
-访问 http://localhost:5052 查看书架。
+For other agents, copy `skill/book-analyst/` into that agent's skill or workflow directory and invoke it as `book-analyst`.
 
-## 短命令
+Example prompt:
 
-| 操作 | 命令 |
-|------|------|
-| 启动 | `docker compose up -d` |
-| 停止 | `docker compose down` |
-| 日志 | `docker compose logs -f` |
-| 重建 | `docker compose up -d --build` |
-| 上传 | 书架页 → 右上角上传按钮 |
-| 分析 | Hermes 聊天: `分析《书名》` |
+```text
+Use the book-analyst skill to configure my book library, analyze this book,
+and generate the Library, Book Home, and Chapter Page outputs.
+```
 
-## 环境变量
+## Analyze A Book
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `MNEMO_PORT` | 端口 | `5000`（映射 5052） |
-| `MNEMO_LANG` | 默认语言 | `zh` |
-| `DATABASE_URL` | 数据库连接 | `sqlite:////app/data/mnemosyne.db` |
-| `VAULT_DIR` | Obsidian vault 路径 | `/app/vault` |
+Initialize a project:
+
+```bash
+python skill/book-analyst/scripts/init_project.py --project-root .
+```
+
+Prepare one source book:
+
+```bash
+python skill/book-analyst/scripts/run_flow.py --project-root . --source path/to/book.epub
+```
+
+The deterministic scripts copy the source, extract text when possible, split chapters, install empty templates, and create the expected project layout. The AI Agent then fills the structured files under `analysis/<book-id>/`.
+
+Render the fixed front-end templates:
+
+```bash
+python skill/book-analyst/scripts/render_project.py --config .book-analyst/config.json --book-id <book-id>
+```
+
+Serve generated HTML:
+
+```bash
+python skill/book-analyst/scripts/start_service.py --config .book-analyst/config.json --port 8765
+```
+
+After rerendering, refresh the browser. The static service does not need to restart.
+
+## Generate A Knowledge Skill
+
+After a book has meaningful structured analysis, it can become a reusable thinking aid:
+
+```bash
+python skill/book-analyst/scripts/generate_book_skill.py analysis/<book-id> --output-root generated-skills
+```
+
+This produces a small `<book-id>-knowledge` skill from the book's thesis, concepts, and reasoning lenses.
+
+## Mnemosyne App
+
+The Flask app is the optional local display layer:
+
+- stores uploaded books and metadata
+- shows the poster-wall Library
+- tracks reading and parse status
+- serves `web/index.html` and `web/chapters/*.html`
+- does not call an LLM or perform the book analysis itself
+
+Quick start:
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+Open http://localhost:5052 to view the Library.
+
+Useful commands:
+
+| Action | Command |
+| --- | --- |
+| Start app | `docker compose up -d` |
+| Stop app | `docker compose down` |
+| Logs | `docker compose logs -f` |
+| Rebuild | `docker compose up -d --build` |
+| Validate skill project | `python skill/book-analyst/scripts/validate_project.py --config .book-analyst/config.json` |
+
+## Environment
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `MNEMO_PORT` | Flask app port | `5000` mapped to `5052` |
+| `MNEMO_LANG` | Default UI language | `zh` |
+| `DATABASE_URL` | Metadata database | `sqlite:////app/data/mnemosyne.db` |
+| `VAULT_DIR` | Book vault path | `/app/vault` |

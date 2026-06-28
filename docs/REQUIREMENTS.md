@@ -1,7 +1,7 @@
 # 书籍分析系统——真需求拆解
 
-> 基于 `skill/book-analysis` 方法论，
-> 以 Hermes Agent 为分析引擎、Mnemosyne 为展示层、
+> 基于 `skill/book-analyst` 方法论，
+> 以支持 skill/workflow 的 AI Agent 为分析引擎、Mnemosyne 为展示层、
 > Golden House Obsidian vault 为知识持久化层。
 
 ## 一、核心架构（3 层）
@@ -17,7 +17,7 @@
 | 书籍架构页 | 读取 vault/web/index.html 渲染 | ✅ 已有 |
 | 章节详情页 | 读取 vault/web/chapters/*.html 渲染 | ✅ 已有 |
 | 健康检查 | `/health` 返回服务状态 | ✅ 已有 |
-| 未解析提示 | 无 web/ 时显示"请在 Hermes 中分析" | ✅ 已有 |
+| 未解析提示 | 无 web/ 时显示"请使用 book-analyst skill 分析" | ✅ 已有 |
 
 **不需要的功能（已删除）**：
 - ❌ 不触发 AI 分析
@@ -25,9 +25,9 @@
 - ❌ 不解析/分割/提取文本
 - ❌ 不生成 HTML
 
-### 2. 分析引擎：Hermes Agent
+### 2. 分析引擎：AI Agent
 
-**职责**：在用户聊天会话中分析书籍，按 book-analysis skill 方法论执行。
+**职责**：在支持 skill/workflow 的用户聊天会话中分析书籍，按 book-analyst skill 方法论执行。
 
 **启动条件**（用户说以下任意一句）：
 - `分析《书名》`
@@ -276,5 +276,5 @@ Thesis: 一句话论题
 
 ---
 
-> 本文档对应 `skill/book-analysis/SKILL.md`，是方法论的项目内说明书。
+> 本文档对应 `skill/book-analyst/SKILL.md`，是方法论的项目内说明书。
 > 所有对方法论本身的需求变更必须同步更新本文档和 skill。

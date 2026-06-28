@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "book-analyst-v1",
+  "bookId": "",
+  "generatedAt": "",
+  "language": "zh-CN",
+  "theme": "warm-paper",
+  "density": "balanced",
+  "sourcePolicy": "short-with-source",
+  "paths": {
+    "bookHome": "web/index.html",
+    "analysis": "analysis/book.json",
+    "themes": "analysis/themes.json",
+    "chapters": "analysis/chapters",
+    "evidence": "analysis/evidence/index.json",
+    "concepts": "analysis/concepts/index.json",
+    "notes": "notes/reading-guide.md"
+  }
+}

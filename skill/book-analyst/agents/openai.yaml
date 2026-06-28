@@ -1,0 +1,7 @@
+interface:
+  display_name: "Book Analyst"
+  short_description: "Visual book analysis and reading maps"
+  default_prompt: "Use $book-analyst to configure my book library, analyze a book, and generate Library, Book Home, and Chapter Page outputs."
+
+policy:
+  allow_implicit_invocation: true
