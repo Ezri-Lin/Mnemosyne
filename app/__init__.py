@@ -183,6 +183,23 @@ def api_upload():
     source_path = book_dir / f"source.{ext}"
     file.save(source_path)
 
+    # Auto-extract metadata from EPUB (override manual fields if empty)
+    if ext == 'epub':
+        epub_meta = extract_epub_metadata(source_path)
+        if epub_meta.get('title') and title == file.filename.rsplit('.', 1)[0]:
+            title = epub_meta['title']
+        if epub_meta.get('author') and author == 'Unknown':
+            author = epub_meta['author']
+        if epub_meta.get('year') and year is None:
+            year = epub_meta['year']
+        if epub_meta.get('lang'):
+            lang = epub_meta['lang']
+        if epub_meta.get('cover_path'):
+            # Copy cover to covers/ directory
+            import shutil
+            cover_dest = config.COVERS_DIR / f"{slug}.jpg"
+            shutil.copy(epub_meta['cover_path'], cover_dest)
+
     # Insert/update DB
     session = get_session()
     book = session.query(Book).filter_by(slug=slug).first()
@@ -291,6 +308,77 @@ def get_all_books():
     session.close()
     return books
 
+
+
+def extract_epub_metadata(filepath):
+    """Extract title, author, year, language, cover from EPUB."""
+    metadata = {}
+    try:
+        from ebooklib import epub
+        book = epub.read_epub(filepath)
+
+        # Extract metadata from Dublin Core
+        dc = book.get_metadata('DC', {})
+        if not dc:
+            # Try alternative: OPF metadata
+            for item_id, item in book.get_items_of_type(9):  # ITEM_DOCUMENT = 9
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(item.get_body_content(), 'xml')
+                    for tag in soup.find_all():
+                        name = tag.name.split(':')[-1].lower()
+                        if name in ('title', 'creator', 'date', 'language') and tag.string:
+                            metadata[name] = tag.string.strip()
+                except:
+                    pass
+
+        # title
+        titles = book.get_metadata('DC', 'title')
+        if titles:
+            metadata['title'] = titles[0][0]
+        # author
+        creators = book.get_metadata('DC', 'creator')
+        if creators:
+            metadata['author'] = creators[0][0]
+        # year
+        dates = book.get_metadata('DC', 'date')
+        if dates:
+            import re
+            year_match = re.search(r'\d{4}', dates[0][0])
+            if year_match:
+                metadata['year'] = int(year_match.group(0))
+        # language
+        langs = book.get_metadata('DC', 'language')
+        if langs:
+            metadata['lang'] = langs[0][0][:2].lower()
+
+        # Try to extract cover image
+        try:
+            cover_id = None
+            for item in book.get_items_of_type(9):  # ITEM_DOCUMENT
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(item.get_body_content(), 'xml')
+                    meta = soup.find('meta', {'name': 'cover'})
+                    if meta and meta.get('content'):
+                        cover_id = meta['content']
+                        break
+                except:
+                    pass
+
+            if cover_id:
+                cover_item = book.get_item_with_id(cover_id)
+                if cover_item:
+                    cover_path = filepath.parent / 'cover.jpg'
+                    cover_path.write_bytes(cover_item.get_content())
+                    metadata['cover_path'] = str(cover_path)
+        except:
+            pass
+
+    except Exception as e:
+        print(f"EPUB metadata extraction warning: {e}")
+
+    return metadata
 
 def analyze_book(slug):
     """
