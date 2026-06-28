@@ -1,105 +1,82 @@
 # Mnemosyne
 
-> **The Mother of Memory** · Your personal reading companion.
-> Mnemosyne (Greek: Μνημοσύνη) was the Titaness of memory and the mother of the nine Muses.
-> This project is your second brain for books — every read, every note, every connection.
+> **The Mother of Memory** · 你的个人阅读伴侣。
+> Mnemosyne（希腊语：Μνημοσύνη）是记忆女神，九位缪斯之母。
+> 展示经 AI 分析后的书籍架构页面 + 章节详情。
 
-## What It Does
+## 架构
 
 ```
-📚 Books arrive (EPUB / PDF / MOBI / TXT)
+Mnemosyne 是纯展示层。AI 分析由 Hermes Agent 在聊天中完成。
+
+📚 上传（Mnemosyne Web 或直接放入 vault）
    ↓
-🔄 Hermes converts to text, detects chapters
+🧠 *Hermes Agent 分析*（在 Hermes 聊天中，按 book-analysis skill 方法论）
+   · Phase 1: God's-eye View（论题 + 论证树 + 水分标注）
+   · Phase 2: 章节分级（价值密度 × 个人推荐）
+   · Phase 3: 生成 HTML（索引页 + 章节详情页）
+   · Phase 4: 对话深读（可选）
    ↓
-🧠 Analyzer extracts frameworks, cases, decisions, research
+🖼️ Mnemosyne 展示（书架 + 架构页 + 章节详情页）
    ↓
-🎨 Generator renders Architecture HTML (god's-eye view + chapter detail)
-   ↓
-🖼️ Poster wall shows your whole library, filterable by status / language / rating
-   ↓
-🔗 Syncs with your Obsidian vault via git (Golden-House repo)
+📝 笔记同步至 Obsidian vault（Golden-House）
 ```
 
-## Architecture
+## 核心方法论：`skill/book-analysis/`
 
 ```
-   ┌─────────────────────────────────────┐
-   │   GitHub: Golden-House (vault)      │  ← single source of truth
-   └──────────┬──────────────────┬───────┘
-              │ git              │ git
-       ┌──────┴──────┐    ┌──────┴──────┐
-       │ Mac (local) │    │  VPS server │
-       │ Hermes      │    │ Flask app   │
-       │ Obsidian UI │    │ Calibre     │
-       │ Daily use   │    │ Public web  │
-       └─────────────┘    └─────────────┘
+skill/book-analysis/
+├── SKILL.md                        ← 完整工作流（Hermes 可加载）
+├── references/
+│   ├── the-body-keeps-the-score-reference.md  ← 标杆产出参考
+│   └── html-patterns.md            ← 14 个 HTML 输出范式
+└── templates/
+    ├── base.html                   ← 页面骨架（暖纸主题）
+    ├── components.md               ← 12 个交互组件
+    └── themes/
+        └── warm-paper.css          ← 默认主题 CSS
 ```
 
-## Project Structure
+使用方式：
+1. 确保 `book-to-webpage` skill 已安装至 `~/.hermes/skills/`
+2. 在 Hermes Agent 聊天中：
+   ```
+   分析《书名》，加载 book-analysis skill
+   ```
+3. Agent 会自动读完文本、按 4-Phase 方法论分析、生成 HTML + vault 笔记
 
-```
-Mnemosyne/
-├── app/                     Flask app (poster wall + upload API + book pages)
-│   └── ...
-├── analyzer/                Book analysis logic (chapter_template, convert, sync)
-├── static/
-│   ├── templates/           HTML templates (poster-wall, chapter, book page)
-│   └── assets/              Static assets
-├── data/                    Runtime data (NOT in git)
-│   ├── books/               Source files (EPUB/PDF/MOBI)
-│   ├── generated/            Generated HTML output
-│   └── covers/               Cached book covers
-├── scripts/                 Operational scripts (sync, deploy, etc.)
-├── tests/                   Test suite
-├── logs/                    Runtime logs
-├── docker-compose.yml       Container orchestration
-└── README.md
-```
+## 技术栈
 
-## Quick Start (Local Development)
+- **后端**: Flask + SQLAlchemy + SQLite
+- **前端**: 纯 HTML/CSS/JS（暖纸主题）
+- **展示**: Poster Wall + Architecture 页 + Chapter 详情页
+- **部署**: Docker（单容器）
+
+## 快速启动
 
 ```bash
-# 1. Clone & setup
-git clone https://github.com/Ezri-Lin/Mnemosyne.git
-cd Mnemosyne
-
-# 2. Install Python deps
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 3. Install Calibre (for ebook conversion)
-brew install calibre  # macOS
-# apt install calibre  # Ubuntu
-
-# 4. Run Flask app
-python -m app.server
-# → http://localhost:5000
+cp .env.example .env   # 配置 vault 路径
+docker compose up -d   # 启动
 ```
 
-## Deploy to VPS (Ubuntu 24)
+访问 http://localhost:5052 查看书架。
 
-```bash
-# On the VPS:
-ssh user@vps
-git clone https://github.com/Ezri-Lin/Mnemosyne.git
-cd Mnemosyne
-docker compose up -d
-# → https://reading.yourdomain.com
-```
+## 短命令
 
-## Sync with Obsidian Vault
+| 操作 | 命令 |
+|------|------|
+| 启动 | `docker compose up -d` |
+| 停止 | `docker compose down` |
+| 日志 | `docker compose logs -f` |
+| 重建 | `docker compose up -d --build` |
+| 上传 | 书架页 → 右上角上传按钮 |
+| 分析 | Hermes 聊天: `分析《书名》` |
 
-```bash
-# Pull latest from Golden-House vault
-./scripts/sync_vault.sh
+## 环境变量
 
-# This:
-# 1. git pulls latest from Golden-House repo
-# 2. Updates local book status / metadata from vault frontmatter
-# 3. Re-runs analysis on changed books
-```
-
-## License
-
-Private project. Not for redistribution.
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `MNEMO_PORT` | 端口 | `5000`（映射 5052） |
+| `MNEMO_LANG` | 默认语言 | `zh` |
+| `DATABASE_URL` | 数据库连接 | `sqlite:////app/data/mnemosyne.db` |
+| `VAULT_DIR` | Obsidian vault 路径 | `/app/vault` |
