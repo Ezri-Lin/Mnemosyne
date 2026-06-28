@@ -37,6 +37,7 @@ h1 { margin:0 0 12px; font:900 28px/1.2 var(--font-display); color:var(--ink); }
   <div class="actions">
     <button class="btn btn-primary" id="parseBtn">⟳ Parse with Hermes</button>
     <button class="btn btn-secondary" onclick="window.location.href='/'">← Back to Wall</button>
+    <button class="btn btn-secondary" id="deleteBtn" style="border-color:var(--red);color:var(--red);">✕ Delete</button>
   </div>
   <p class="back">After parsing, you'll see:
     <br>God's-eye Architecture • Chapter detail pages • Frameworks &amp; case studies • Decision rules</p>
@@ -59,6 +60,29 @@ document.getElementById('parseBtn').onclick = function() {
     .catch(() => {
       this.textContent = '✗ Failed. Try again.';
       this.disabled = false;
+    });
+};
+
+document.getElementById('deleteBtn').onclick = function() {
+  if (!confirm('Delete "{{ book_title or slug }}"? This removes the book file and all data permanently.')) return;
+  var btn = this;
+  btn.textContent = '⏳ Deleting...';
+  btn.disabled = true;
+  fetch('/api/books/{{ slug }}', { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status === 'ok') {
+        window.location.href = '/';
+      } else {
+        alert('Error: ' + (d.error || 'unknown'));
+        btn.textContent = '✕ Delete';
+        btn.disabled = false;
+      }
+    })
+    .catch(function() {
+      alert('Failed to delete. Try again.');
+      btn.textContent = '✕ Delete';
+      btn.disabled = false;
     });
 };
 </script>

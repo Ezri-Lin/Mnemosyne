@@ -121,6 +121,31 @@ def poster_wall():
     return render_template('poster-wall.html', books=get_all_books())
 
 
+@app.route('/api/books/<slug>', methods=['DELETE'])
+def api_delete_book(slug):
+    """Delete a book: remove DB entry + source files + generated files."""
+    import shutil
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    if not book:
+        session.close()
+        return jsonify({'error': 'not found'}), 404
+    
+    # Remove DB entry
+    session.delete(book)
+    session.commit()
+    session.close()
+    
+    # Remove files
+    for d in [config.BOOKS_DIR / slug, config.GENERATED_DIR / slug]:
+        if d.exists():
+            shutil.rmtree(d)
+    cover = config.COVERS_DIR / f"{slug}.jpg"
+    if cover.exists():
+        cover.unlink()
+    
+    return jsonify({'status': 'ok', 'message': f'Deleted {slug}'})
+
 @app.route('/covers/<path:filename>')
 def serve_cover(filename):
     return send_from_directory(config.COVERS_DIR, filename)
