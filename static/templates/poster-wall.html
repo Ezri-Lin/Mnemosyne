@@ -161,12 +161,14 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
     <h1>Reading Wall</h1>
     <p class="subtitle">A bird's-eye view of every book you've touched. Click any cover → book Architecture page (or upload form if queued).</p>
   </div>
+  <div style="display:flex;gap:8px;align-items:stretch;">
   <div class="stats" id="stats"></div>
+  <button class="upload-btn" id="uploadBtn" style="align-self:stretch;display:flex;align-items:center;justify-content:center;border:2px dashed var(--line);background:transparent;color:var(--muted);font:700 13px/1.4 var(--font-display);cursor:pointer;padding:14px 18px;border-radius:6px;min-width:80px;transition:all .15s;" onmouseenter="this.style.borderColor='var(--gold)';this.style.color='var(--ink)'" onmouseleave="this.style.borderColor='var(--line)';this.style.color='var(--muted)'">+ Add<br>Book</button>
+</div>
 </section>
 
 <!-- FILTER BAR -->
 <div class="filter-bar">
-  <button class="upload-btn" id="uploadBtn">+ Add</button>
   <div class="filter-group">
     <span class="filter-label">Status</span>
     <button class="filter-btn active" data-filter="all">All <span class="count" id="cnt-all"></span></button>
@@ -174,6 +176,12 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
     <button class="filter-btn" data-filter="reading">● Reading <span class="count" id="cnt-reading"></span></button>
     <button class="filter-btn" data-filter="to-read">○ To Read <span class="count" id="cnt-to-read"></span></button>
     <button class="filter-btn" data-filter="paused">⏸ Paused <span class="count" id="cnt-paused"></span></button>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Analyzed</span>
+    <button class="filter-btn active" data-parse="all">All</button>
+    <button class="filter-btn" data-parse="parsed">✓ Parsed</button>
+    <button class="filter-btn" data-parse="not-parsed">? Not Yet</button>
   </div>
   <div class="filter-group">
     <span class="filter-label">Lang</span>
@@ -344,6 +352,7 @@ function renderCards() {
       'data-rating="' + (b.rating || 0) + '" ' +
       'data-year="' + b.year + '" ' +
       'data-added="' + (b.added_at || "") + '" ' +
+      'data-parse="' + (b.parse_status || 'not-parsed') + '" ' +
       'data-search="' + esc((b.title + " " + b.author + " " + (b.tags||[]).join(" ")).toLowerCase()) + '" ' +
       'href="' + href + '">' +
       '<div class="poster-cover">' +
@@ -373,10 +382,18 @@ function renderCards() {
 // ====== Sort + filter ======
 var activeStatus = "all";
 var activeLang = "all";
+var activeParse = "all";
 var sortKey = "recent";
 
 function sortBooks(arr) {
   var sorted = arr.slice();
+  // Always sort parsed to the top first
+  sorted.sort(function(a, b) {
+    var pa = a.parse_status === "parsed" ? 0 : 1;
+    var pb = b.parse_status === "parsed" ? 0 : 1;
+    return pa - pb;
+  });
+  // Then apply user-selected sort within each group
   switch (sortKey) {
     case "title":      sorted.sort(function(a, b) { return a.title.localeCompare(b.title); }); break;
     case "author":     sorted.sort(function(a, b) { return a.author.localeCompare(b.author); }); break;
@@ -397,8 +414,9 @@ function applyFilters() {
   cards.forEach(function(card) {
     var matchStatus = activeStatus === "all" || card.dataset.status === activeStatus;
     var matchLang = activeLang === "all" || card.dataset.lang === activeLang;
+    var matchParse = activeParse === "all" || card.dataset.parse === activeParse;
     var matchSearch = !q || card.dataset.search.indexOf(q) >= 0;
-    var v = matchStatus && matchLang && matchSearch;
+    var v = matchStatus && matchLang && matchParse && matchSearch;
     card.classList.toggle("hidden", !v);
     if (v) visible++;
   });
@@ -437,6 +455,14 @@ document.querySelectorAll(".filter-btn[data-lang]").forEach(function(btn) {
     document.querySelectorAll(".filter-btn[data-lang]").forEach(function(x) { x.classList.remove("active"); });
     btn.classList.add("active");
     activeLang = btn.dataset.lang;
+    applyFilters();
+  };
+});
+document.querySelectorAll(".filter-btn[data-parse]").forEach(function(btn) {
+  btn.onclick = function() {
+    document.querySelectorAll(".filter-btn[data-parse]").forEach(function(x) { x.classList.remove("active"); });
+    btn.classList.add("active");
+    activeParse = btn.dataset.parse;
     applyFilters();
   };
 });
