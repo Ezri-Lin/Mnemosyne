@@ -376,45 +376,52 @@ def get_all_books():
 def extract_epub_metadata(filepath):
     """Extract title, author, year, language, cover from EPUB."""
     from pathlib import Path
+    import re
     metadata = {}
     try:
         from ebooklib import epub
         book = epub.read_epub(str(filepath))
 
-        # Get all metadata
-        for ns_key in book.metadata:
-            for item in book.metadata[ns_key]:
-                name = item[0]
-                value = str(item[1][0]) if item[1] else ''
-                if not value:
+        # book.metadata[namespace] is a dict: {field_name: [(value, attrs), ...]}
+        for ns_key, fields in book.metadata.items():
+            for name, values in fields.items():
+                if not values:
                     continue
-                name_lower = name.lower()
+                # values is a list of tuples: [(value_string, attrs_dict), ...]
+                val_tuple = values[0]
+                value_str = str(val_tuple[0]) if val_tuple else ''
+
+                name_lower = name.lower().split(':')[-1]  # strip namespace prefix
                 if name_lower == 'title':
-                    metadata['title'] = value
+                    metadata['title'] = value_str
                 elif name_lower == 'creator':
-                    metadata['author'] = value
+                    metadata['author'] = value_str
                 elif name_lower == 'date':
-                    import re
-                    year_match = re.search(r'\d{4}', value)
+                    year_match = re.search(r'\d{4}', value_str)
                     if year_match:
                         metadata['year'] = int(year_match.group(0))
                 elif name_lower == 'language':
-                    metadata['lang'] = value[:2].lower()
+                    metadata['lang'] = value_str[:2].lower()
 
-        # Fallback: try traditional DC access
-        if not metadata.get('title'):
-            titles = book.get_metadata('DC', 'title')
-            if titles and titles[0][0]: metadata['title'] = str(titles[0][0])
-        if not metadata.get('author'):
-            creators = book.get_metadata('DC', 'creator')
-            if creators and creators[0][0]: metadata['author'] = str(creators[0][0])
-        if not metadata.get('lang'):
-            langs = book.get_metadata('DC', 'language')
-            if langs and langs[0][0]: metadata['lang'] = str(langs[0][0])[:2].lower()
+        # Cover: look for meta name="cover" in OPF items
+        try:
+            from bs4 import BeautifulSoup
+            for item in book.get_items_of_type(9):  # ITEM_DOCUMENT
+                soup = BeautifulSoup(item.get_body_content(), 'xml')
+                meta = soup.find('meta', {'name': 'cover'})
+                if meta and meta.get('content'):
+                    cover_item = book.get_item_with_id(meta['content'])
+                    if cover_item:
+                        cover_path = Path(filepath).parent / 'cover.jpg'
+                        cover_path.write_bytes(cover_item.get_content())
+                        metadata['cover_path'] = str(cover_path)
+                    break
+        except Exception:
+            pass
 
     except Exception as e:
         import traceback
-        print(f"EPUB metadata warning: {e}")
+        print(f"EPUB metadata error: {e}")
         traceback.print_exc()
 
     return metadata
