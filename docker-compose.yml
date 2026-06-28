@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mnemosyne:
     build: .
@@ -8,9 +6,10 @@ services:
       - "5052:5000"
     volumes:
       - ./data:/app/data
+      - /home/lighthouse/Golden-House:/app/vault
     environment:
-      - DATABASE_URL=sqlite:///app/data/mnemosyne.db
-      - MNEMO_LANG=en
+      - DATABASE_URL=sqlite:////app/data/mnemosyne.db
+      - MNEMO_LANG=zh
       - MNEMO_PORT=5000
-      - VAULT_DIR=/app/data/vault-sync
+      - VAULT_DIR=/app/vault
     restart: unless-stopped

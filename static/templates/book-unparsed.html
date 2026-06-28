@@ -4,87 +4,88 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ book_title or slug }} — Mnemosyne</title>
+<link rel="stylesheet" href="/static/style.css">
 <style>
-:root {
-  --ink: #171411; --muted: #6d6258; --paper: #f8f2e7; --paper-deep: #ece1cf;
-  --line: #d8c8af; --red: #b9422f; --blue: #245f73; --green: #4d6f48; --gold: #c2872d;
-  --white: #fffaf0; --shadow: 0 18px 50px rgba(55,38,19,.14);
-  --font-body: "Songti SC","Noto Serif CJK SC",Georgia,serif;
-  --font-display: "PingFang SC","Microsoft YaHei",sans-serif;
-  --bg: radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%);
-  --surface: rgba(255,250,240,.62); --surface-strong: rgba(255,250,240,.72);
-  --ink-soft: #3d332b;
+body {
+  margin:0;
+  background:radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%);
+  min-height:100vh;
+  color:#171411;
+  font-family:"Songti SC","Noto Serif CJK SC",Georgia,serif;
 }
-* { box-sizing: border-box; }
-body { margin:0; color:var(--ink); background:var(--bg); font-family:var(--font-body); min-height:100vh; display:grid; place-items:center; }
-.card { width:min(560px,calc(100% - 48px)); padding:40px; background:var(--surface-strong); border:1px solid var(--line); box-shadow:var(--shadow); border-radius:8px; text-align:center; }
-h1 { margin:0 0 12px; font:900 28px/1.2 var(--font-display); color:var(--ink); }
-.subtitle { color:var(--muted); font-size:15px; line-height:1.6; margin:0 0 32px; }
-.actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
-.btn { padding:12px 24px; border:0; cursor:pointer; font:800 14px/1.4 var(--font-display); border-radius:3px; }
-.btn-primary { background:var(--red); color:var(--white); }
-.btn-primary:hover { background:var(--ink); }
-.btn-secondary { background:var(--white); color:var(--ink-soft); border:1px solid var(--line); }
-.btn-secondary:hover { border-color:var(--gold); }
-.back { margin-top:20px; color:var(--muted); font-size:13px; }
-.back a { color:var(--blue); }
+.topbar {
+  position:fixed;top:0;left:0;right:0;
+  z-index:100;padding:12px 24px;
+  background:rgba(255,250,240,.72);border-bottom:1px solid #d8c8af;
+  backdrop-filter:blur(8px);
+  display:flex;align-items:center;gap:12px;
+}
+.topbar a {
+  color:#3d332b;text-decoration:none;
+  font:800 14px/1.4 "PingFang SC","Microsoft YaHei",sans-serif;
+}
+.topbar .sep { color:#6d6258;font-size:12px; }
+.page {
+  width:min(900px,calc(100%-32px));
+  margin:0 auto;padding:80px 0 44px;
+}
+.card {
+  margin:24px 0;padding:28px;
+  background:rgba(255,250,240,.62);
+  border:1px solid #d8c8af;
+  border-radius:3px;
+}
+h1 {
+  margin:0 0 12px;
+  font:900 28px/1.2 "PingFang SC","Microsoft YaHei",sans-serif;
+  color:#171411;
+}
+.subtitle { color:#6d6258;font-size:17px;line-height:1.7; }
+.actions { display:flex;gap:12px;margin-top:20px; }
+.btn {
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 18px;border:none;border-radius:3px;
+  font:700 13px/1.4 "PingFang SC","Microsoft YaHei",sans-serif;
+  cursor:pointer;text-decoration:none;
+}
+.btn-primary { background:#245f73;color:#fffaf0; }
+.btn-primary:hover { background:#1a4a5a; }
+.btn-secondary {
+  background:transparent;color:#171411;
+  border:1px solid #d8c8af;
+}
+.btn-secondary:hover { background:rgba(216,200,175,.3); }
+.info-box {
+  margin:24px 0;
+  padding:16px 20px;
+  background:rgba(194,135,45,.12);
+  border-left:4px solid #c2872d;
+  font-size:15px;line-height:1.7;
+  color:#3d332b;
+}
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>{{ book_title or slug }}</h1>
-  <p class="subtitle">This book hasn't been analyzed yet. Click "Parse" to have AI extract chapters, frameworks, cases, and generate an interactive Architecture page.</p>
-  <div class="actions">
-    <button class="btn btn-primary" id="parseBtn">⟳ Parse with Hermes</button>
-    <button class="btn btn-secondary" onclick="window.location.href='/'">← Back to Wall</button>
-    <button class="btn btn-secondary" id="deleteBtn" style="border-color:var(--red);color:var(--red);">✕ Delete</button>
-  </div>
-  <p class="back">After parsing, you'll see:
-    <br>God's-eye Architecture • Chapter detail pages • Frameworks &amp; case studies • Decision rules</p>
+<div class="topbar">
+  <a href="/">&larr; Wall</a>
+  <span class="sep">/</span>
+  <span style="font:700 13px/1.4 'PingFang SC','Microsoft YaHei',sans-serif;color:#171411;">{{ book_title or slug }}</span>
 </div>
-<script>
-document.getElementById('parseBtn').onclick = function() {
-  this.textContent = '⏳ Queued...';
-  this.disabled = true;
-  fetch('/api/parse/{{ slug }}', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => {
-      if (d.status === 'ok') {
-        this.textContent = '✓ Started! Refresh in a few minutes.';
-        this.style.background = 'var(--green)';
-      } else {
-        this.textContent = '✗ Error: ' + (d.error || 'unknown');
-        this.style.background = 'var(--red)';
-      }
-    })
-    .catch(() => {
-      this.textContent = '✗ Failed. Try again.';
-      this.disabled = false;
-    });
-};
+<div class="page">
+  <div class="card">
+    <h1 style="margin-top:24px;">{{ book_title or slug }}</h1>
+    <p class="subtitle">This book hasn't been analyzed yet.</p>
 
-document.getElementById('deleteBtn').onclick = function() {
-  if (!confirm('Delete "{{ book_title or slug }}"? This removes the book file and all data permanently.')) return;
-  var btn = this;
-  btn.textContent = '⏳ Deleting...';
-  btn.disabled = true;
-  fetch('/api/books/{{ slug }}', { method: 'DELETE' })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.status === 'ok') {
-        window.location.href = '/';
-      } else {
-        alert('Error: ' + (d.error || 'unknown'));
-        btn.textContent = '✕ Delete';
-        btn.disabled = false;
-      }
-    })
-    .catch(function() {
-      alert('Failed to delete. Try again.');
-      btn.textContent = '✕ Delete';
-      btn.disabled = false;
-    });
-};
-</script>
+    <div class="info-box">
+      <strong>📖 怎么分析这本书？</strong><br>
+      在 Hermes Agent 聊天中输入：<br><br>
+      <code style="background:#ece1cf;padding:3px 8px;border-radius:2px;font-size:14px;">分析《{{ book_title or slug }}》，用 book-analysis skill，按 The Body Keeps the Score 模板输出</code>
+    </div>
+
+    <div class="actions">
+      <a href="/" class="btn btn-secondary">&larr; Back to Wall</a>
+    </div>
+  </div>
+</div>
 </body>
 </html>

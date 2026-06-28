@@ -1,11 +1,15 @@
 """
-Mnemosyne Flask app.
+Mnemosyne — display layer for book analysis.
 - /              → poster wall (books grid)
-- /book/<slug>   → book Architecture page
+- /book/<slug>   → book Architecture page (serves vault web/index.html)
 - /api/books     → JSON book list
-- /api/upload    → POST file (EPUB/PDF/MOBI) → trigger analysis
+- /api/upload    → POST file (EPUB/PDF)
 - /api/status    → GET/PUT book status
 - /health        → liveness probe
+
+NOTE: AI analysis no longer happens here. All analysis is done by Hermes Agent
+in chat sessions (see book-analysis skill). Mnemosyne only stores, displays,
+and serves the results.
 """
 
 import os
@@ -21,13 +25,14 @@ from app import config
 app = Flask(__name__, static_folder='../static', template_folder='../static/templates')
 CORS(app)
 
+
 # ============ Per-request language ============
+
 @app.before_request
 def set_language():
     """Language can be overridden per-request via ?lang=zh or Accept-Language header."""
     req_lang = request.args.get('lang')
     if not req_lang:
-        # Parse from Accept-Language
         accept = request.headers.get('Accept-Language', '')
         for part in accept.split(','):
             code = part.split(';')[0].strip().lower()[:2]
@@ -35,6 +40,7 @@ def set_language():
                 req_lang = code
                 break
     g.lang = req_lang if req_lang in config.SUPPORTED_LANGUAGES else config.LANGUAGE
+
 
 @app.context_processor
 def inject_globals():
@@ -46,6 +52,7 @@ def inject_globals():
 
 
 # ============ Database (with DATABASE_URL support) ============
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
@@ -53,18 +60,19 @@ from sqlalchemy import Column, String, Integer, Text, DateTime
 
 Base = declarative_base()
 
+
 class Book(Base):
     __tablename__ = 'books'
     slug = Column(String, primary_key=True)
     title = Column(String, nullable=False)
     author = Column(String)
     lang = Column(String, default='en')
-    status = Column(String, default='to-read')  # to-read, reading, completed, paused, dropped
+    status = Column(String, default='to-read')
     rating = Column(Integer, default=0)
     year = Column(Integer)
-    tags = Column(Text)  # JSON array
+    tags = Column(Text)
     added_at = Column(String)
-    source_format = Column(String)  # epub, pdf, mobi, txt
+    source_format = Column(String)
     source_path = Column(String)
     vault_path = Column(String)
     notes = Column(Text)
@@ -76,19 +84,17 @@ class Book(Base):
 class SyncLog(Base):
     __tablename__ = 'sync_log'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source = Column(String)  # 'vault' or 'upload'
-    action = Column(String)  # 'create', 'update', 'analyze'
+    source = Column(String)
+    action = Column(String)
     book_slug = Column(String)
-    status = Column(String)  # 'ok' or 'error'
+    status = Column(String)
     message = Column(Text)
     created_at = Column(String, default=lambda: datetime.now().isoformat())
 
 
 def get_engine():
-    """Create SQLAlchemy engine from DATABASE_URL."""
     url = config.DATABASE_URL
     if url.startswith('sqlite:///'):
-        # Ensure SQLite file path is absolute
         path = url.replace('sqlite:///', '')
         if not os.path.isabs(path):
             path = str(config.ROOT / path)
@@ -105,7 +111,79 @@ def get_session():
     return SessionLocal()
 
 
+# ============ Helpers ============
+
+def make_slug(title, author=None):
+    """Generate URL-safe slug from title."""
+    import re
+    s = title if author is None else f'{title}-{author}'
+    s = s.lower().strip()
+    s = re.sub(r'[^a-z0-9\u4e00-\u9fff]+', '-', s)
+    return s.strip('-')
+
+
+def get_all_books():
+    """Return all books as list of dicts."""
+    session = get_session()
+    books = session.query(Book).order_by(Book.added_at.desc()).all()
+    result = []
+    for b in books:
+        data = {
+            'slug': b.slug,
+            'title': b.title or b.slug,
+            'author': b.author or '',
+            'lang': b.lang or 'en',
+            'status': b.status or 'to-read',
+            'rating': b.rating or 0,
+            'year': b.year,
+            'tags': json.loads(b.tags) if b.tags else [],
+            'added_at': b.added_at or '',
+            'last_analyzed': b.last_analyzed or '',
+            'source_format': b.source_format or '',
+            'notes': b.notes or '',
+            'parse_status': 'parsed' if b.last_analyzed else 'not-parsed',
+        }
+        # Check for web/index.html in vault
+        if config.VAULT_DIR and config.VAULT_BOOKS_DIR:
+            for folder in config.VAULT_BOOKS_DIR.iterdir():
+                if not folder.is_dir():
+                    continue
+                folder_slug = make_slug(folder.name)
+                if folder_slug == b.slug and (folder / 'web' / 'index.html').exists():
+                    data['parse_status'] = 'parsed'
+                    break
+        result.append(data)
+    session.close()
+    return result
+
+
+def find_source(slug):
+    """Find source file for a book. Checks vault first, then local BOOKS_DIR."""
+    # Vault: 5.0 Books & Reading/Books/<slug>/source/
+    if config.VAULT_DIR and config.VAULT_BOOKS_DIR:
+        for folder in config.VAULT_BOOKS_DIR.iterdir():
+            if not folder.is_dir():
+                continue
+            folder_slug = make_slug(folder.name)
+            if folder_slug == slug:
+                src_dir = folder / 'source'
+                if src_dir.exists():
+                    for f in sorted(src_dir.iterdir()):
+                        if f.suffix.lower() in ('.txt', '.md', '.epub', '.pdf'):
+                            return f, 'vault'
+                break  # Found folder but no source
+
+    # Local: data/books/<slug>/
+    local = config.BOOKS_DIR / slug
+    if local.exists():
+        for f in sorted(local.iterdir()):
+            if f.suffix.lower() in ('.txt', '.md', '.epub', '.pdf'):
+                return f, 'local'
+    return None, None
+
+
 # ============ No-Cache ============
+
 @app.after_request
 def add_no_cache(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -113,123 +191,95 @@ def add_no_cache(response):
     response.headers['Expires'] = '0'
     return response
 
+
 # ============ Routes ============
 
 @app.route('/')
 def poster_wall():
-    """Main page - poster wall."""
     return render_template('poster-wall.html', books=get_all_books())
 
 
 @app.route('/api/books/<slug>', methods=['DELETE'])
 def api_delete_book(slug):
-    """Delete a book: remove DB entry + source files + generated files."""
     import shutil
     session = get_session()
     book = session.query(Book).filter_by(slug=slug).first()
     if not book:
         session.close()
         return jsonify({'error': 'not found'}), 404
-    
-    # Remove DB entry
     session.delete(book)
     session.commit()
     session.close()
-    
-    # Remove files
     for d in [config.BOOKS_DIR / slug, config.GENERATED_DIR / slug]:
         if d.exists():
             shutil.rmtree(d)
-    cover = config.COVERS_DIR / f"{slug}.jpg"
-    if cover.exists():
-        cover.unlink()
-    
-    return jsonify({'status': 'ok', 'message': f'Deleted {slug}'})
+    return jsonify({'status': 'ok'})
 
-@app.route('/covers/<path:filename>')
-def serve_cover(filename):
-    return send_from_directory(config.COVERS_DIR, filename)
+
+def _find_vault_folder(slug):
+    """Find vault folder matching slug (case-insensitive, slug-normalized)."""
+    import re as _re
+    if not config.VAULT_BOOKS_DIR or not config.VAULT_BOOKS_DIR.exists():
+        return None
+    for folder in config.VAULT_BOOKS_DIR.iterdir():
+        if not folder.is_dir():
+            continue
+        folder_slug = _re.sub(r'[^a-z0-9\u4e00-\u9fff]+', '-', folder.name.lower()).strip('-')
+        if folder_slug == slug:
+            return folder
+    return None
+
 
 @app.route('/book/<slug>/')
 def book_page(slug):
-    """Book architecture page. First check generated/, then vault with case-insensitive matching."""
-    gen_dir = config.GENERATED_DIR / slug
-    if (gen_dir / 'index.html').exists():
-        return send_from_directory(gen_dir, 'index.html')
-    # Fallback: check vault — try case-insensitive folder match
-    if config.VAULT_BOOKS_DIR.exists():
-        for folder in config.VAULT_BOOKS_DIR.iterdir():
-            if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
-                web_index = folder / 'web' / 'index.html'
-                if web_index.exists():
-                    return send_from_directory(web_index.parent, 'index.html')
-                break
-        # Also check sub-dirs (Reading/ To-Read/ Completed/)
-        for status_sub in ('Reading', 'To-Read', 'Completed'):
-            sub = config.VAULT_BOOKS_DIR / status_sub
-            if sub.exists():
-                for folder in sub.iterdir():
-                    if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
-                        web_index = folder / 'web' / 'index.html'
-                        if web_index.exists():
-                            return send_from_directory(web_index.parent, 'index.html')
-                        break
-    return render_template('book-unparsed.html', slug=slug, book_title="Unknown")
+    """Serve book Architecture page from vault web/ directory."""
+    # First check generated dir
+    gen_index = config.GENERATED_DIR / slug / 'index.html'
+    if gen_index.exists():
+        return send_from_directory(gen_index.parent, 'index.html')
+
+    # Then check vault
+    folder = _find_vault_folder(slug)
+    if folder:
+        web_index = folder / 'web' / 'index.html'
+        if web_index.exists():
+            return send_from_directory(web_index.parent, 'index.html')
+
+    # No parsed content → show unparsed template
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    session.close()
+    if book:
+        return render_template('book-unparsed.html', slug=slug, book_title=book.title or slug)
+    return jsonify({'error': 'not found'}), 404
 
 
 @app.route('/book/<slug>/<path:subpath>')
 def book_subpath(slug, subpath):
-    """Serve any sub-file under a book's web/ directory (chapters, CSS, images)."""
-    # Try generated dir first
+    """Serve static files (CSS, JS, chapters/*.html) from vault web/."""
+    # Check generated dir
     gen_file = config.GENERATED_DIR / slug / subpath
-    if gen_file.exists():
+    if gen_file.exists() and gen_file.is_file():
         return send_from_directory(gen_file.parent, gen_file.name)
 
-    # Fallback: case-insensitive vault search
-    for folder in config.VAULT_BOOKS_DIR.iterdir():
-        if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
-            web_file = folder / 'web' / subpath
-            if web_file.exists():
-                return send_from_directory(web_file.parent, web_file.name)
-            break
-    # Also check sub-dirs
-    for status_sub in ('Reading', 'To-Read', 'Completed'):
-        sub = config.VAULT_BOOKS_DIR / status_sub
-        if sub.exists():
-            for folder in sub.iterdir():
-                if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
-                    web_file = folder / 'web' / subpath
-                    if web_file.exists():
-                        return send_from_directory(web_file.parent, web_file.name)
-                    return "Not found", 404
+    # Check vault
+    folder = _find_vault_folder(slug)
+    if folder:
+        vault_file = folder / 'web' / subpath
+        if vault_file.exists():
+            return send_from_directory(vault_file.parent, vault_file.name)
 
-    return "Not found", 404
-
-
-@app.route('/chapter/<slug>/<chapter>.html')
-def chapter_page(slug, chapter):
-    """Serve a specific chapter HTML."""
-    gen_file = config.GENERATED_DIR / slug / 'chapters' / chapter
-    if gen_file.exists():
-        return send_from_directory(gen_file.parent, gen_file.name)
-    return "Not found", 404
+    return jsonify({'error': 'not found'}), 404
 
 
 @app.route('/api/books')
 def api_books():
-    """JSON list of all books."""
     books = get_all_books()
     return jsonify(books)
 
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
-    """
-    POST file (multipart) + metadata.
-    1. Save to data/books/<slug>/source.<ext>
-    2. Run analyzer (convert + extract chapters + render HTML)
-    3. Update DB
-    """
     if 'file' not in request.files:
         return jsonify({'error': 'no file'}), 400
     file = request.files['file']
@@ -237,25 +287,31 @@ def api_upload():
     author = request.form.get('author', 'Unknown')
     lang = request.form.get('lang', config.LANGUAGE)
     status = request.form.get('status', 'to-read')
-    notes = request.form.get('notes', '')
-
-    # Generate slug from title + author
     slug = make_slug(title, author)
     ext = file.filename.rsplit('.', 1)[-1].lower()
 
     try:
-        # Save file
-        book_dir = config.BOOKS_DIR / slug
-        book_dir.mkdir(parents=True, exist_ok=True)
-        source_path = book_dir / f"source.{ext}"
-        file.save(source_path)
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{ext}') as tmp:
+            file.save(tmp)
+            tmp_path = tmp.name
 
-        # Auto-extract metadata from EPUB
-        auto_title = title
-        auto_author = author
-        auto_year = None
-        auto_lang = lang
+        vault_dir = config.VAULT_BOOKS_DIR / slug / 'source'
+        local_dir = config.BOOKS_DIR / slug
+        try:
+            vault_dir.mkdir(parents=True, exist_ok=True)
+            source_path = vault_dir / f"{slug}.{ext}"
+            import shutil
+            shutil.copy(tmp_path, source_path)
+            vault_path = str((config.VAULT_BOOKS_DIR / slug).relative_to(config.VAULT_DIR))
+        except (OSError, PermissionError):
+            local_dir.mkdir(parents=True, exist_ok=True)
+            source_path = local_dir / f"source.{ext}"
+            shutil.copy(tmp_path, source_path)
+            vault_path = ''
+        os.unlink(tmp_path)
 
+        auto_title, auto_author, auto_year, auto_lang = title, author, None, lang
         if ext == 'epub':
             epub_meta = extract_epub_metadata(source_path)
             if epub_meta.get('title'):
@@ -271,7 +327,6 @@ def api_upload():
                 cover_dest = config.COVERS_DIR / f"{slug}.jpg"
                 shutil.copy(epub_meta['cover_path'], cover_dest)
 
-        # Insert/update DB
         session = get_session()
         book = session.query(Book).filter_by(slug=slug).first()
         if book is None:
@@ -284,7 +339,7 @@ def api_upload():
                 tags='[]',
                 year=auto_year,
                 source_format=ext,
-                source_path=str(source_path.relative_to(config.ROOT)),
+                vault_path=vault_path or str(source_path.relative_to(config.ROOT)),
                 notes='',
                 added_at=datetime.now().isoformat(),
             )
@@ -292,11 +347,8 @@ def api_upload():
         else:
             book.title = auto_title
             book.author = auto_author
-            book.year = auto_year
             book.updated_at = datetime.now().isoformat()
         session.commit()
-
-        # Analysis triggered manually via Parse button
         session.close()
 
         return jsonify({'status': 'ok', 'slug': slug, 'message': f'Book {slug} uploaded'})
@@ -305,14 +357,13 @@ def api_upload():
         traceback.print_exc()
         try:
             session.close()
-        except:
+        except Exception:
             pass
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 @app.route('/api/status/<slug>', methods=['PUT'])
 def api_update_status(slug):
-    """Update book status (to-read, reading, completed, paused, dropped)."""
     data = request.json
     new_status = data.get('status')
     rating = data.get('rating')
@@ -333,7 +384,6 @@ def api_update_status(slug):
 
 @app.route('/api/config')
 def api_config():
-    """Expose non-sensitive config (for frontend)."""
     return jsonify({
         'language': config.LANGUAGE,
         'default_lang': config.LANGUAGE,
@@ -345,120 +395,63 @@ def api_config():
 
 @app.route('/api/preview', methods=['POST'])
 def api_preview():
-    """Preview metadata from an uploaded file before adding it."""
     if 'file' not in request.files:
         return jsonify({'error': 'no file'}), 400
     file = request.files['file']
     ext = file.filename.rsplit('.', 1)[-1].lower()
-
     import tempfile
     tmp = tempfile.NamedTemporaryFile(suffix='.' + ext, delete=False)
     tmp.close()
     file.save(tmp.name)
-
     meta = {'title': '', 'author': '', 'year': None, 'lang': 'en'}
-
     if ext == 'epub':
         epub_meta = extract_epub_metadata(tmp.name)
         if epub_meta:
             meta.update({k: v for k, v in epub_meta.items() if v})
-
     try:
         os.unlink(tmp.name)
-    except:
+    except Exception:
         pass
-
     return jsonify({'status': 'ok', 'metadata': meta})
 
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'ok', 'version': '0.1.0'})
+    return jsonify({'status': 'ok', 'version': '0.2.0', 'mode': 'display-only'})
 
 
-# ============ Helpers ============
-
-def make_slug(title, author):
-    import re
-    s = (title + ' ' + author).lower()
-    s = re.sub(r'[^a-z0-9]+', '-', s)
-    return s.strip('-')
-
-
-def get_all_books():
-    """Read all books from DB, with parse status from vault."""
-    session = get_session()
-    books = []
-    for b in session.query(Book).order_by(Book.title).all():
-        # Check if vault has web/index.html -> parsed
-        vault_path = b.vault_path or ''
-        parse_status = 'not-parsed'
-        if vault_path:
-            # Resolve to absolute path (vault_path stored as relative to vault root)
-            full_path = os.path.join(config.VAULT_DIR, vault_path) if not os.path.isabs(vault_path) else vault_path
-            web_index = os.path.join(full_path, 'web', 'index.html')
-            chapters_dir = os.path.join(full_path, 'web', 'chapters')
-            if os.path.exists(web_index) or (os.path.isdir(chapters_dir) and os.listdir(chapters_dir)):
-                parse_status = 'parsed'
-        # Check if cover image exists
-        cover_file = config.COVERS_DIR / f"{b.slug}.jpg"
-        has_cover = cover_file.exists()
-        
-        books.append({
-            'slug': b.slug,
-            'title': b.title,
-            'author': b.author,
-            'lang': b.lang,
-            'status': b.status,
-            'rating': b.rating or 0,
-            'year': b.year,
-            'tags': json.loads(b.tags) if b.tags else [],
-            'added_at': b.added_at,
-            'notes': b.notes,
-            'parse_status': parse_status,
-            'has_cover': has_cover,
-        })
-    session.close()
-    return books
-
-
+# ============ EPUB Metadata Extraction ============
 
 def extract_epub_metadata(filepath):
-    """Extract title, author, year, language, cover from EPUB."""
-    from pathlib import Path
-    import re
+    """Extract title, author, year, language, cover from EPUB. 4-level cover fallback."""
+    import re as _re
     metadata = {}
     try:
         from ebooklib import epub
+        from bs4 import BeautifulSoup
         book = epub.read_epub(str(filepath))
 
-        # book.metadata[namespace] is a dict: {field_name: [(value, attrs), ...]}
         for ns_key, fields in book.metadata.items():
             for name, values in fields.items():
                 if not values:
                     continue
-                # values is a list of tuples: [(value_string, attrs_dict), ...]
                 val_tuple = values[0]
                 value_str = str(val_tuple[0]) if val_tuple else ''
-
-                name_lower = name.lower().split(':')[-1]  # strip namespace prefix
+                name_lower = name.lower().split(':')[-1]
                 if name_lower == 'title':
                     metadata['title'] = value_str
                 elif name_lower == 'creator':
                     metadata['author'] = value_str
                 elif name_lower == 'date':
-                    year_match = re.search(r'\d{4}', value_str)
+                    year_match = _re.search(r'\d{4}', value_str)
                     if year_match:
                         metadata['year'] = int(year_match.group(0))
                 elif name_lower == 'language':
                     metadata['lang'] = value_str[:2].lower()
 
-        # Cover: 4 strategies, ordered by reliability
+        # Cover: 4 strategies
         try:
             cover_id = None
-            
-            # Strategy 1: OPF <meta name="cover"> via book.metadata
-            # (ebooklib does NOT expose the OPF file as an item, but parses it into metadata)
             opf_ns = 'http://www.idpf.org/2007/opf'
             if opf_ns in book.metadata:
                 for name, values in book.metadata[opf_ns].items():
@@ -470,15 +463,11 @@ def extract_epub_metadata(filepath):
                                 break
                     if cover_id:
                         break
-            
-            # Strategy 2: EPUB3 item with id='cover-image'
             if not cover_id:
                 for item in book.get_items():
                     if (item.get_id() or '').lower() == 'cover-image':
                         cover_id = item.get_id()
                         break
-            
-            # Strategy 3: item id or filename contains "cover"
             if not cover_id:
                 for item in book.get_items():
                     n = (item.get_name() or '').lower()
@@ -486,8 +475,6 @@ def extract_epub_metadata(filepath):
                     if 'cover' in i or 'cover' in n:
                         cover_id = item.get_id()
                         break
-            
-            # Strategy 4: parse ZIP directly, find spine's first page, extract its first <img>
             if not cover_id:
                 try:
                     import zipfile
@@ -511,8 +498,8 @@ def extract_epub_metadata(filepath):
                                             opf_dir = str(Path(opf_path).parent)
                                             pg = str(Path(opf_dir) / el.get('href')) if opf_dir else el.get('href')
                                             page_html = zf.read(pg).decode('utf-8', errors='replace')
-                                            page = BeautifulSoup(page_html, 'html.parser')
-                                            imgs = page.find_all('img')
+                                            page_soup = BeautifulSoup(page_html, 'html.parser')
+                                            imgs = page_soup.find_all('img')
                                             if imgs:
                                                 pg_dir = str(Path(pg).parent)
                                                 img_p = str(Path(pg_dir) / imgs[0].get('src')) if pg_dir else imgs[0].get('src')
@@ -525,7 +512,6 @@ def extract_epub_metadata(filepath):
                     zf.close()
                 except Exception:
                     pass
-            
             if cover_id:
                 cover_item = book.get_item_with_id(cover_id)
                 if cover_item:
@@ -534,61 +520,17 @@ def extract_epub_metadata(filepath):
                     metadata['cover_path'] = str(cover_path)
         except Exception:
             pass
-
     except Exception as e:
         import traceback
         print(f"EPUB metadata error: {e}")
         traceback.print_exc()
-
     return metadata
-def analyze_book(slug):
-    """
-    Convert source file → TXT, extract chapters, render HTML.
-    """
-    book_dir = config.BOOKS_DIR / slug
-    source_path = next(iter(book_dir.glob('source.*')), None)
-    if not source_path:
-        return False
-
-    ext = source_path.suffix.lstrip('.')
-
-    # Step 1: convert to TXT
-    txt_path = book_dir / 'source.txt'
-    if ext == 'txt':
-        import shutil
-        shutil.copy(source_path, txt_path)
-    elif ext == 'epub':
-        subprocess.run(['/Applications/calibre.app/Contents/MacOS/ebook-convert', str(source_path), str(txt_path)], check=True)
-    elif ext in ('pdf',):
-        subprocess.run(['pdftotext', str(source_path), str(txt_path)], check=True)
-    # TODO: mobi, azw, etc.
-
-    # Step 2: extract chapters + render HTML
-    # TODO: implement chapter extraction
-    gen_dir = config.GENERATED_DIR / slug
-    gen_dir.mkdir(parents=True, exist_ok=True)
-    (gen_dir / 'README.txt').write_text(f"Analysis pending for {slug}. Source: {txt_path}")
-
-    # Update DB
-    session = get_session()
-    book = session.query(Book).filter_by(slug=slug).first()
-    if book:
-        book.last_analyzed = datetime.now().isoformat()
-        book.updated_at = datetime.now().isoformat()
-        session.commit()
-    session.close()
-    return True
 
 
 # ============ Main ============
+
 if __name__ == '__main__':
     config.BOOKS_DIR.mkdir(parents=True, exist_ok=True)
-    config.GENERATED_DIR.mkdir(parents=True, exist_ok=True)
     config.COVERS_DIR.mkdir(parents=True, exist_ok=True)
-    config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    warnings = config.validate()
-    if warnings:
-        print("Config warnings:")
-        for w in warnings:
-            print(f"  - {w}")
-    app.run(debug=True, host='0.0.0.0', port=config.DEFAULT_PORT)
+    config.GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+    app.run(host='0.0.0.0', port=config.DEFAULT_PORT, debug=True)
