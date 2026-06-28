@@ -180,14 +180,7 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
       <button class="filter-btn" data-filter="to-read">○ Queued <span class="count" id="cnt-to-read"></span></button>
       <button class="filter-btn" data-filter="paused">⏸ Paused <span class="count" id="cnt-paused"></span></button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <div class="filter-group">
-        <button class="filter-btn active" data-lang="all">EN+中文</button>
-        <button class="filter-btn" data-lang="en">EN</button>
-        <button class="filter-btn" data-lang="zh">中文</button>
-      </div>
-      <input type="text" class="search-box" id="searchBox" placeholder="Search...">
-    </div>
+    <input type="text" class="search-box" id="searchBox" placeholder="Search...">
   </div>
 
   <!-- Row 2: Analyzed + Lang (left) | Sort (right) -->
@@ -210,7 +203,12 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
 
   <!-- Row 3: View toggle (right) -->
   <div class="filter-row">
-    <div></div>
+    <div class="filter-group">
+      <span class="filter-label">Language</span>
+      <button class="filter-btn active" data-lang="all">All</button>
+      <button class="filter-btn" data-lang="en">EN</button>
+      <button class="filter-btn" data-lang="zh">中文</button>
+    </div>
     <div class="view-toggle" id="viewToggle">
       <button data-view="grid" class="active" title="Grid view">▦ Grid</button>
       <button data-view="list" title="List view">☰ List</button>
