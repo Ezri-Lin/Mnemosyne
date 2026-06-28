@@ -298,6 +298,34 @@ def api_config():
     })
 
 
+@app.route('/api/preview', methods=['POST'])
+def api_preview():
+    """Preview metadata from an uploaded file before adding it."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'no file'}), 400
+    file = request.files['file']
+    ext = file.filename.rsplit('.', 1)[-1].lower()
+
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(suffix='.' + ext, delete=False)
+    tmp.close()
+    file.save(tmp.name)
+
+    meta = {'title': '', 'author': '', 'year': None, 'lang': 'en'}
+
+    if ext == 'epub':
+        epub_meta = extract_epub_metadata(tmp.name)
+        if epub_meta:
+            meta.update({k: v for k, v in epub_meta.items() if v})
+
+    try:
+        os.unlink(tmp.name)
+    except:
+        pass
+
+    return jsonify({'status': 'ok', 'metadata': meta})
+
+
 @app.route('/health')
 def health():
     return jsonify({'status': 'ok', 'version': '0.1.0'})
@@ -347,91 +375,49 @@ def get_all_books():
 
 def extract_epub_metadata(filepath):
     """Extract title, author, year, language, cover from EPUB."""
+    from pathlib import Path
     metadata = {}
     try:
         from ebooklib import epub
-        book = epub.read_epub(filepath)
+        book = epub.read_epub(str(filepath))
 
-        # Extract metadata from Dublin Core
-        dc = book.get_metadata('DC', {})
-        if not dc:
-            # Try alternative: OPF metadata
-            for item_id, item in book.get_items_of_type(9):  # ITEM_DOCUMENT = 9
-                try:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(item.get_body_content(), 'xml')
-                    for tag in soup.find_all():
-                        name = tag.name.split(':')[-1].lower()
-                        if name in ('title', 'creator', 'date', 'language') and tag.string:
-                            metadata[name] = tag.string.strip()
-                except:
-                    pass
+        # Get all metadata
+        for ns_key in book.metadata:
+            for item in book.metadata[ns_key]:
+                name = item[0]
+                value = str(item[1][0]) if item[1] else ''
+                if not value:
+                    continue
+                name_lower = name.lower()
+                if name_lower == 'title':
+                    metadata['title'] = value
+                elif name_lower == 'creator':
+                    metadata['author'] = value
+                elif name_lower == 'date':
+                    import re
+                    year_match = re.search(r'\d{4}', value)
+                    if year_match:
+                        metadata['year'] = int(year_match.group(0))
+                elif name_lower == 'language':
+                    metadata['lang'] = value[:2].lower()
 
-        # title
-        titles = book.get_metadata('DC', 'title')
-        if titles:
-            metadata['title'] = titles[0][0]
-        # author
-        creators = book.get_metadata('DC', 'creator')
-        if creators:
-            metadata['author'] = creators[0][0]
-        # year
-        dates = book.get_metadata('DC', 'date')
-        if dates:
-            import re
-            year_match = re.search(r'\d{4}', dates[0][0])
-            if year_match:
-                metadata['year'] = int(year_match.group(0))
-        # language
-        langs = book.get_metadata('DC', 'language')
-        if langs:
-            metadata['lang'] = langs[0][0][:2].lower()
-
-        # Try to extract cover image
-        try:
-            cover_id = None
-            for item in book.get_items_of_type(9):  # ITEM_DOCUMENT
-                try:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(item.get_body_content(), 'xml')
-                    meta = soup.find('meta', {'name': 'cover'})
-                    if meta and meta.get('content'):
-                        cover_id = meta['content']
-                        break
-                except:
-                    pass
-
-            if cover_id:
-                cover_item = book.get_item_with_id(cover_id)
-                if cover_item:
-                    cover_path = filepath.parent / 'cover.jpg'
-                    cover_path.write_bytes(cover_item.get_content())
-                    metadata['cover_path'] = str(cover_path)
-        except:
-            pass
+        # Fallback: try traditional DC access
+        if not metadata.get('title'):
+            titles = book.get_metadata('DC', 'title')
+            if titles and titles[0][0]: metadata['title'] = str(titles[0][0])
+        if not metadata.get('author'):
+            creators = book.get_metadata('DC', 'creator')
+            if creators and creators[0][0]: metadata['author'] = str(creators[0][0])
+        if not metadata.get('lang'):
+            langs = book.get_metadata('DC', 'language')
+            if langs and langs[0][0]: metadata['lang'] = str(langs[0][0])[:2].lower()
 
     except Exception as e:
-        print(f"EPUB metadata extraction warning: {e}")
+        import traceback
+        print(f"EPUB metadata warning: {e}")
+        traceback.print_exc()
 
     return metadata
-
-@app.route('/api/parse/<slug>', methods=['POST'])
-def api_parse(slug):
-    """Trigger AI parsing for a book. Returns immediately, runs async."""
-    session = get_session()
-    book = session.query(Book).filter_by(slug=slug).first()
-    if not book:
-        return jsonify({'status': 'error', 'error': 'book not found'}), 404
-
-    # For now: acknowledge and queue (full impl later)
-    book.last_analyzed = 'queued'
-    session.commit()
-    session.close()
-    return jsonify({'status': 'ok', 'message': f'Parse queued for {slug}'})
-
-
-# Insert before analyze_book function
-
 def analyze_book(slug):
     """
     Convert source file → TXT, extract chapters, render HTML.

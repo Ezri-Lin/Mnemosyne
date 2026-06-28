@@ -555,13 +555,39 @@ function handleFile(file) {
   fileDrop.classList.add("has-file");
   fileDrop.querySelector(".fd-icon").textContent = "✓";
   fileDrop.querySelector(".fd-label").textContent = file.name + " (" + (file.size / 1024 / 1024).toFixed(2) + " MB)";
-  // Auto-detect from filename (fallback until server-side extraction)
+
+  // Show preview panel with placeholder
   var name = file.name.replace(/\.(epub|pdf|mobi|azw3?|txt)$/i, "");
   document.getElementById("bookTitle").value = name;
-  document.getElementById("bookAuthor").value = "Auto-detecting...";
-  document.getElementById("bookLangDisplay").value = "?";
+  document.getElementById("bookAuthor").value = "...";
+  document.getElementById("bookLangDisplay").value = "...";
   document.getElementById("autoMeta").style.display = "grid";
   document.getElementById("autoMeta2").style.display = "grid";
+
+  // Call preview API to get real metadata
+  var fd = new FormData();
+  fd.append("file", file);
+  fetch("/api/preview", { method: "POST", body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status === "ok" && d.metadata) {
+        var m = d.metadata;
+        if (m.title) document.getElementById("bookTitle").value = m.title;
+        if (m.author) document.getElementById("bookAuthor").value = m.author;
+        if (m.lang) {
+          document.getElementById("bookLangDisplay").value = m.lang.toUpperCase();
+          document.getElementById("bookLang").value = m.lang;
+        }
+        if (m.year) {
+          document.getElementById("bookYearDisplay").value = m.year;
+          document.getElementById("bookYear").value = m.year;
+        }
+        fileDrop.querySelector(".fd-hint").textContent = m.author ? (m.author + " · " + (m.year || "")) : "Metadata extracted";
+      }
+    })
+    .catch(function() {
+      // Keep placeholder values on error
+    });
 }
 
 // Submit upload
