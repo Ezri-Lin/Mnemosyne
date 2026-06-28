@@ -106,6 +106,10 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
 .poster-meta .meta-status { font:700 10px/1.4 var(--font-display); letter-spacing:.04em; text-transform:uppercase; }
 .meta-completed { color:var(--status-completed); }
 .meta-reading { color:var(--status-reading); }
+.meta-info { margin:4px 0 0; font:700 12px/1.5 var(--font-display); color:var(--muted); }
+.meta-parse { font-weight:500; }
+.meta-parse.parse-parsed { color:var(--green); }
+.meta-parse.parse-not-parsed { color:var(--muted); }
 .meta-to-read { color:var(--status-to-read); }
 .meta-paused { color:var(--status-paused); }
 .meta-dropped { color:var(--status-dropped); }
@@ -375,8 +379,7 @@ function renderCards() {
       'href="' + href + '">' +
       '<div class="poster-cover">' +
         '<div class="cover-art" style="background:' + b.cover_style + ';">' +
-          (b.cover_url ? ('<img src="' + b.cover_url + '" class="cover-img" onerror="this.style.display=\'none\'" loading="lazy">') : '') +
-          '<div class="cover-icon">' + esc(b.icon) + '</div>' +
+          (b.cover_url ? ('<img src="' + b.cover_url + '" class="cover-img" onerror="this.style.display=\'none\'" loading="lazy">') : ('<div class="cover-icon">' + esc(b.icon) + '</div>')) +
           '<div class="cover-year">' + b.year + '</div>' +
           '<div>' +
             '<h3 class="cover-title">' + esc(b.title) + '</h3>' +
@@ -384,14 +387,12 @@ function renderCards() {
             '<div class="cover-tags">' + tagsHtml + '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="status-badge status-' + b.status + '">' + cfg.symbol + '</div>' +
-        '<div class="parse-badge parse-' + (b.parse_status || 'not-parsed') + '" title="' + ((b.parse_status === 'parsed') ? 'AI Analyzed' : 'Not Yet Analyzed') + '">' + ((b.parse_status === 'parsed') ? '&#10003;' : '?') + '</div>' +
         ratingHtml +
       '</div>' +
       '<div class="poster-meta">' +
         '<p class="meta-title">' + esc(b.title) + '</p>' +
         '<p class="meta-author">' + esc(b.author) + '</p>' +
-        '<p class="meta-status meta-' + b.status + '">' + cfg.symbol + " " + cfg.label + ' · ' + b.lang.toUpperCase() + '</p>' +
+        '<p class="meta-info"><span class="meta-status meta-' + b.status + '">' + cfg.symbol + ' ' + cfg.label + '</span> · ' + b.lang.toUpperCase() + ' · <span class="meta-parse parse-' + (b.parse_status || 'not-parsed') + '">' + ((b.parse_status === 'parsed') ? '✓ Parsed' : '? Not parsed') + '</span></p>' +
       '</div>' +
     '</a>';
   }).join("");
