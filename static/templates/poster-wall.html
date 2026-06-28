@@ -361,9 +361,6 @@ function renderStats() {
 function renderCards() {
   var html = books.map(function(b) {
     var cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG["to-read"];
-    var ratingHtml = b.rating > 0
-      ? '<div class="rating">' + "★".repeat(b.rating) + "</div>"
-      : '<div class="rating-empty">unrated</div>';
     var href = "/book/" + b.slug + "/";
     return '<a class="poster-card" ' +
       'data-status="' + b.status + '" ' +
@@ -378,7 +375,6 @@ function renderCards() {
         '<div class="cover-art" style="background:' + b.cover_style + ';">' +
           (b.cover_url ? ('<img src="' + b.cover_url + '" class="cover-img" onerror="this.style.display=\'none\'" loading="lazy">') : '') +
         '</div>' +
-        ratingHtml +
       '</div>' +
       '<div class="poster-meta">' +
         '<p class="meta-title">' + esc(b.title) + '</p>' +
