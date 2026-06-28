@@ -364,9 +364,6 @@ function renderCards() {
     var ratingHtml = b.rating > 0
       ? '<div class="rating">' + "★".repeat(b.rating) + "</div>"
       : '<div class="rating-empty">unrated</div>';
-    var tagsHtml = (b.tags || []).slice(0, 2).map(function(t) {
-      return '<span class="cover-tag">' + esc(t) + '</span>';
-    }).join("");
     var href = "/book/" + b.slug + "/";
     return '<a class="poster-card" ' +
       'data-status="' + b.status + '" ' +
@@ -379,12 +376,7 @@ function renderCards() {
       'href="' + href + '">' +
       '<div class="poster-cover">' +
         '<div class="cover-art" style="background:' + b.cover_style + ';">' +
-          (b.cover_url ? ('<img src="' + b.cover_url + '" class="cover-img" onerror="this.style.display=\'none\'" loading="lazy">') : ('<div class="cover-icon">' + esc(b.icon) + '</div>')) +
-          '<div>' +
-            '<h3 class="cover-title">' + esc(b.title) + '</h3>' +
-            '<p class="cover-author">' + esc(b.author) + '</p>' +
-            '<div class="cover-tags">' + tagsHtml + '</div>' +
-          '</div>' +
+          (b.cover_url ? ('<img src="' + b.cover_url + '" class="cover-img" onerror="this.style.display=\'none\'" loading="lazy">') : '') +
         '</div>' +
         ratingHtml +
       '</div>' +
