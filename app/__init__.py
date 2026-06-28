@@ -212,19 +212,23 @@ def api_upload():
     source_path = book_dir / f"source.{ext}"
     file.save(source_path)
 
-    # Auto-extract metadata from EPUB (override manual fields if empty)
+    # Auto-extract metadata from EPUB
+    auto_title = title
+    auto_author = author
+    auto_year = None
+    auto_lang = lang
+
     if ext == 'epub':
         epub_meta = extract_epub_metadata(source_path)
-        if epub_meta.get('title') and title == file.filename.rsplit('.', 1)[0]:
-            title = epub_meta['title']
-        if epub_meta.get('author') and author == 'Unknown':
-            author = epub_meta['author']
-        if epub_meta.get('year') and year is None:
-            year = epub_meta['year']
+        if epub_meta.get('title'):
+            auto_title = epub_meta['title']
+        if epub_meta.get('author'):
+            auto_author = epub_meta['author']
+        if epub_meta.get('year'):
+            auto_year = epub_meta['year']
         if epub_meta.get('lang'):
-            lang = epub_meta['lang']
+            auto_lang = epub_meta['lang']
         if epub_meta.get('cover_path'):
-            # Copy cover to covers/ directory
             import shutil
             cover_dest = config.COVERS_DIR / f"{slug}.jpg"
             shutil.copy(epub_meta['cover_path'], cover_dest)
@@ -235,20 +239,22 @@ def api_upload():
     if book is None:
         book = Book(
             slug=slug,
-            title=title,
-            author=author,
-            lang=lang,
+            title=auto_title,
+            author=auto_author,
+            lang=auto_lang,
             status=status,
             tags='[]',
+            year=auto_year,
             source_format=ext,
             source_path=str(source_path.relative_to(config.ROOT)),
-            notes=notes,
+            notes='',
             added_at=datetime.now().isoformat(),
         )
         session.add(book)
     else:
-        book.title = title
-        book.author = author
+        book.title = auto_title
+        book.author = auto_author
+        book.year = auto_year
         book.updated_at = datetime.now().isoformat()
     session.commit()
 
