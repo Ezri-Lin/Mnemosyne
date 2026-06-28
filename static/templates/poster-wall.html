@@ -274,6 +274,11 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
         </select>
       </div>
 
+      <div>
+        <label style="display:block;font:700 12px/1.4 var(--font-display);color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">Why this book? (optional)</label>
+        <textarea id="bookReason" placeholder="e.g. 直接解释神经系统为什么紧张" style="width:100%;min-height:48px;padding:8px 12px;border:1px solid var(--line);background:var(--white);font:400 14px/1.5 var(--font-display);border-radius:3px;resize:vertical;"></textarea>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="modal-btn secondary" id="cancelBtn">Cancel</button>
         <button type="submit" class="modal-btn primary">Add to Library</button>
@@ -396,6 +401,7 @@ var activeStatus = "all";
 var activeLang = "all";
 var activeParse = "all";
 var sortKey = "recent";
+var selectedFile = null;
 
 function sortBooks(arr) {
   var sorted = arr.slice();
@@ -545,6 +551,7 @@ fileDrop.ondrop = function(e) {
 fileInput.onchange = function(e) { if (e.target.files.length > 0) handleFile(e.target.files[0]); };
 
 function handleFile(file) {
+  selectedFile = file;
   fileDrop.classList.add("has-file");
   fileDrop.querySelector(".fd-icon").textContent = "✓";
   fileDrop.querySelector(".fd-label").textContent = file.name + " (" + (file.size / 1024 / 1024).toFixed(2) + " MB)";
@@ -564,8 +571,7 @@ document.getElementById("uploadForm").onsubmit = function(e) {
   var author = document.getElementById("bookAuthor").value.trim();
   var lang = document.getElementById("bookLang").value || "en";
   var status = document.getElementById("bookStatus").value;
-  var fileInput = document.getElementById("fileInput");
-  var file = fileInput.files[0];
+  var file = selectedFile || (fileInput && fileInput.files[0]);
   if (!file) { showToast("Please select a file first"); return; }
   var fd = new FormData();
   fd.append("file", file);
