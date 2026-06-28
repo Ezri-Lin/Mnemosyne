@@ -206,63 +206,71 @@ def api_upload():
     slug = make_slug(title, author)
     ext = file.filename.rsplit('.', 1)[-1].lower()
 
-    # Save file
-    book_dir = config.BOOKS_DIR / slug
-    book_dir.mkdir(parents=True, exist_ok=True)
-    source_path = book_dir / f"source.{ext}"
-    file.save(source_path)
+    try:
+        # Save file
+        book_dir = config.BOOKS_DIR / slug
+        book_dir.mkdir(parents=True, exist_ok=True)
+        source_path = book_dir / f"source.{ext}"
+        file.save(source_path)
 
-    # Auto-extract metadata from EPUB
-    auto_title = title
-    auto_author = author
-    auto_year = None
-    auto_lang = lang
+        # Auto-extract metadata from EPUB
+        auto_title = title
+        auto_author = author
+        auto_year = None
+        auto_lang = lang
 
-    if ext == 'epub':
-        epub_meta = extract_epub_metadata(source_path)
-        if epub_meta.get('title'):
-            auto_title = epub_meta['title']
-        if epub_meta.get('author'):
-            auto_author = epub_meta['author']
-        if epub_meta.get('year'):
-            auto_year = epub_meta['year']
-        if epub_meta.get('lang'):
-            auto_lang = epub_meta['lang']
-        if epub_meta.get('cover_path'):
-            import shutil
-            cover_dest = config.COVERS_DIR / f"{slug}.jpg"
-            shutil.copy(epub_meta['cover_path'], cover_dest)
+        if ext == 'epub':
+            epub_meta = extract_epub_metadata(source_path)
+            if epub_meta.get('title'):
+                auto_title = epub_meta['title']
+            if epub_meta.get('author'):
+                auto_author = epub_meta['author']
+            if epub_meta.get('year'):
+                auto_year = epub_meta['year']
+            if epub_meta.get('lang'):
+                auto_lang = epub_meta['lang']
+            if epub_meta.get('cover_path'):
+                import shutil
+                cover_dest = config.COVERS_DIR / f"{slug}.jpg"
+                shutil.copy(epub_meta['cover_path'], cover_dest)
 
-    # Insert/update DB
-    session = get_session()
-    book = session.query(Book).filter_by(slug=slug).first()
-    if book is None:
-        book = Book(
-            slug=slug,
-            title=auto_title,
-            author=auto_author,
-            lang=auto_lang,
-            status=status,
-            tags='[]',
-            year=auto_year,
-            source_format=ext,
-            source_path=str(source_path.relative_to(config.ROOT)),
-            notes='',
-            added_at=datetime.now().isoformat(),
-        )
-        session.add(book)
-    else:
-        book.title = auto_title
-        book.author = auto_author
-        book.year = auto_year
-        book.updated_at = datetime.now().isoformat()
-    session.commit()
+        # Insert/update DB
+        session = get_session()
+        book = session.query(Book).filter_by(slug=slug).first()
+        if book is None:
+            book = Book(
+                slug=slug,
+                title=auto_title,
+                author=auto_author,
+                lang=auto_lang,
+                status=status,
+                tags='[]',
+                year=auto_year,
+                source_format=ext,
+                source_path=str(source_path.relative_to(config.ROOT)),
+                notes='',
+                added_at=datetime.now().isoformat(),
+            )
+            session.add(book)
+        else:
+            book.title = auto_title
+            book.author = auto_author
+            book.year = auto_year
+            book.updated_at = datetime.now().isoformat()
+        session.commit()
 
-    # Trigger analysis (MVP: sync)
-    analyze_book(slug)
-    session.close()
+        # Analysis triggered manually via Parse button
+        session.close()
 
-    return jsonify({'status': 'ok', 'slug': slug, 'message': f'Book {slug} uploaded'})
+        return jsonify({'status': 'ok', 'slug': slug, 'message': f'Book {slug} uploaded'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        try:
+            session.close()
+        except:
+            pass
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 @app.route('/api/status/<slug>', methods=['PUT'])
@@ -442,7 +450,7 @@ def analyze_book(slug):
         import shutil
         shutil.copy(source_path, txt_path)
     elif ext == 'epub':
-        subprocess.run(['ebook-convert', str(source_path), str(txt_path)], check=True)
+        subprocess.run(['/Applications/calibre.app/Contents/MacOS/ebook-convert', str(source_path), str(txt_path)], check=True)
     elif ext in ('pdf',):
         subprocess.run(['pdftotext', str(source_path), str(txt_path)], check=True)
     # TODO: mobi, azw, etc.
