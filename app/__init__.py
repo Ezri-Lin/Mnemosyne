@@ -494,14 +494,18 @@ def extract_epub_metadata(filepath):
                     cover_path.write_bytes(cover_item.get_content())
                     metadata['cover_path'] = str(cover_path)
 
-            # Strategy 4: fallback to first image
+            # Strategy 4: fallback to first image that looks like a cover
             if not cover_id:
                 for item in book.get_items():
                     if item.get_type() == 1:  # ITEM_IMAGE
-                        cover_path = Path(filepath).parent / 'cover.jpg'
-                        cover_path.write_bytes(item.get_content())
-                        metadata['cover_path'] = str(cover_path)
-                        break
+                        name = (item.get_name() or '').lower()
+                        mid = (item.get_id() or '').lower()
+                        # Only use if filename suggests it's a cover
+                        if any(kw in name for kw in ['cover', 'cvi', '_001_', 'front']) or any(kw in mid for kw in ['cover', 'cvi']):
+                            cover_path = Path(filepath).parent / 'cover.jpg'
+                            cover_path.write_bytes(item.get_content())
+                            metadata['cover_path'] = str(cover_path)
+                            break
         except Exception:
             pass
 
