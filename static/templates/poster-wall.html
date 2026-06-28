@@ -262,24 +262,32 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
 
 <script>
 // ====== Book data (16 books) ======
-var books = [
-  {slug:"atomic-habits", title:"Atomic Habits", author:"James Clear", lang:"en", status:"completed", rating:5, year:2018, icon:"AH", cover_style:"linear-gradient(135deg,#b9422f,#c2872d)", tags:["productivity","habits"], added_at:"2026-05-15"},
-  {slug:"thinking-fast-and-slow", title:"Thinking, Fast and Slow", author:"Daniel Kahneman", lang:"en", status:"completed", rating:5, year:2011, icon:"TF", cover_style:"linear-gradient(135deg,#245f73,#4d6f48)", tags:["psychology","decision-making"], added_at:"2026-04-20"},
-  {slug:"sapiens", title:"Sapiens", author:"Yuval Noah Harari", lang:"en", status:"completed", rating:4, year:2014, icon:"SH", cover_style:"linear-gradient(135deg,#4d6f48,#c2872d)", tags:["history","philosophy"], added_at:"2026-03-10"},
-  {slug:"man-search-meaning", title:"Man's Search for Meaning", author:"Viktor Frankl", lang:"en", status:"completed", rating:5, year:1946, icon:"MS", cover_style:"linear-gradient(135deg,#c2872d,#b9422f)", tags:["psychology","philosophy"], added_at:"2026-02-05"},
-  {slug:"the-body-keeps-the-score", title:"The Body Keeps the Score", author:"Bessel van der Kolk", lang:"en", status:"reading", rating:0, year:2014, icon:"BK", cover_style:"linear-gradient(135deg,#b9422f,#171411)", tags:["trauma","neuroscience"], detail_url:"web/index.html", added_at:"2026-06-01"},
-  {slug:"antifragile", title:"Antifragile", author:"Nassim Taleb", lang:"en", status:"reading", rating:0, year:2012, icon:"AF", cover_style:"linear-gradient(135deg,#245f73,#171411)", tags:["philosophy","risk"], added_at:"2026-06-15"},
-  {slug:"meditations", title:"Meditations", author:"Marcus Aurelius", lang:"en", status:"reading", rating:0, year:180, icon:"MA", cover_style:"linear-gradient(135deg,#4d6f48,#171411)", tags:["philosophy","stoicism"], added_at:"2026-06-20"},
-  {slug:"influence", title:"Influence", author:"Robert Cialdini", lang:"en", status:"to-read", rating:0, year:1984, icon:"IN", cover_style:"linear-gradient(135deg,#c2872d,#245f73)", tags:["psychology","marketing"], added_at:"2026-05-01"},
-  {slug:"first-principles", title:"First Principles Thinking", author:"Various", lang:"en", status:"to-read", rating:0, year:2020, icon:"FP", cover_style:"linear-gradient(135deg,#b9422f,#245f73)", tags:["thinking","methods"], added_at:"2026-04-10"},
-  {slug:"deep-work", title:"Deep Work", author:"Cal Newport", lang:"en", status:"to-read", rating:0, year:2016, icon:"DW", cover_style:"linear-gradient(135deg,#245f73,#c2872d)", tags:["productivity","focus"], added_at:"2026-03-25"},
-  {slug:"thinking-in-systems", title:"Thinking in Systems", author:"Donella Meadows", lang:"en", status:"to-read", rating:0, year:2008, icon:"TS", cover_style:"linear-gradient(135deg,#4d6f48,#b9422f)", tags:["systems","thinking"], added_at:"2026-02-15"},
-  {slug:"finite-and-infinite-games", title:"Finite and Infinite Games", author:"James Carse", lang:"en", status:"paused", rating:0, year:1986, icon:"FG", cover_style:"linear-gradient(135deg,#c2872d,#6d6258)", tags:["philosophy"], added_at:"2026-01-30"},
-  {slug:"ego-is-the-enemy", title:"Ego Is the Enemy", author:"Ryan Holiday", lang:"en", status:"paused", rating:0, year:2016, icon:"EE", cover_style:"linear-gradient(135deg,#b9422f,#6d6258)", tags:["philosophy","self-help"], added_at:"2026-01-15"},
-  {slug:"sheng-ming", title:"生命的意义", author:"维克多·弗兰克尔", lang:"zh", status:"completed", rating:5, year:1946, icon:"生", cover_style:"linear-gradient(135deg,#4d6f48,#c2872d)", tags:["心理学","哲学"], added_at:"2026-04-15"},
-  {slug:"ren-lei", title:"人类简史", author:"尤瓦尔·赫拉利", lang:"zh", status:"completed", rating:4, year:2014, icon:"人", cover_style:"linear-gradient(135deg,#c2872d,#b9422f)", tags:["历史"], added_at:"2026-03-05"},
-  {slug:"si-xiang", title:"思考，快与慢", author:"丹尼尔·卡尼曼", lang:"zh", status:"reading", rating:0, year:2011, icon:"思", cover_style:"linear-gradient(135deg,#b9422f,#4d6f48)", tags:["心理学"], added_at:"2026-06-10"}
-];
+var books = {{ books | tojson | safe }}.map(function(b) {
+  // Generate icon from title initials
+  var words = (b.title || "").split(/[\s·]+/).filter(function(w) { return w.length > 0; });
+  b.icon = words.slice(0, 2).map(function(w) { return w.charAt(0).toUpperCase(); }).join("");
+  // Generate cover style from a palette
+  var palettes = [
+    "linear-gradient(135deg,#b9422f,#c2872d)",
+    "linear-gradient(135deg,#245f73,#4d6f48)",
+    "linear-gradient(135deg,#4d6f48,#c2872d)",
+    "linear-gradient(135deg,#c2872d,#b9422f)",
+    "linear-gradient(135deg,#b9422f,#171411)",
+    "linear-gradient(135deg,#245f73,#171411)"
+  ];
+  b.cover_style = palettes[Math.abs(hash(b.slug || b.title)) % palettes.length];
+  // Tags: use real tags if available, else []
+  b.tags = b.tags || [];
+  b.added_at = b.added_at || "2026-01-01";
+  b.rating = b.rating || 0;
+  return b;
+});
+
+function hash(s) {
+  var h = 0;
+  for (var i = 0; i < (s || "").length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 var STATUS_CONFIG = {
   completed: { symbol: "✓", label: "Completed", color: "var(--status-completed)" },
