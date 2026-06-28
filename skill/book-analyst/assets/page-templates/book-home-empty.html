@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Book Home</title>
+<title>Mnemosyne · Book Home</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_DATA_URI}}">
 <style>
 :root{--ink:#171411;--muted:#6d6258;--paper:#f8f2e7;--paper-deep:#ece1cf;--line:#d8c8af;--red:#b9422f;--blue:#245f73;--green:#4d6f48;--gold:#c2872d;--white:#fffaf0;--surface:rgba(255,250,240,.64);--surface-strong:rgba(255,250,240,.76);--font-body:"Songti SC","Noto Serif CJK SC",Georgia,serif;--font-display:"PingFang SC","Microsoft YaHei",sans-serif;--bg:radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%)}
 *{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--bg);font-family:var(--font-body)}button{font:inherit;color:inherit}.page{width:min(1220px,calc(100% - 32px));margin:0 auto;padding:22px 0 40px}
-.top{display:flex;align-items:center;gap:8px;margin-bottom:14px}.home{display:inline-grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);background:var(--surface);border-radius:5px}.home svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.top{display:flex;align-items:center;gap:8px;margin-bottom:14px}.home{display:inline-flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:6px 10px}.home .mnemo-mark{width:28px;height:28px;display:block;flex:0 0 auto}.home strong{display:block;font:900 13px/1 var(--font-display);letter-spacing:.11em}.home .brand-sub{display:block;margin-top:3px;color:var(--muted);font:800 8px/1 var(--font-display);letter-spacing:.22em}
 .hero{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:end;margin-bottom:18px}.eyebrow{color:var(--red);font:800 12px/1.2 var(--font-display);letter-spacing:.05em}.hero h1{margin:8px 0;font:900 clamp(34px,6vw,68px)/1 var(--font-display)}.lede{color:var(--ink-soft,#3d332b);font-size:18px;line-height:1.65}.thesis{border-left:6px solid var(--red);background:var(--surface-strong);padding:18px;box-shadow:0 14px 38px rgba(55,38,19,.12)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.stat{border:1px solid var(--line);background:var(--surface);padding:11px}.stat strong{display:block;font:900 20px/1 var(--font-display);color:var(--blue)}.stat span{font:11px/1.4 var(--font-display);color:var(--muted)}
 .shell{display:grid;grid-template-columns:300px 1fr 300px;gap:14px}.panel{border:1px solid var(--line);background:var(--surface);padding:15px}.panel h2{margin:0 0 10px;font:900 18px/1.2 var(--font-display)}.theme{width:100%;text-align:left;border:1px solid var(--line);background:var(--white);padding:10px;margin-bottom:8px;border-radius:7px;cursor:pointer}.theme.active{border-color:var(--red);box-shadow:inset 4px 0 0 var(--red)}.theme strong{display:block;font:900 14px/1.2 var(--font-display)}.theme span{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px}
@@ -19,7 +20,7 @@
 <body>
 <main class="page">
   <nav class="top" aria-label="Book navigation">
-    <a class="home" href="{{LIBRARY_HREF}}" aria-label="Back to Library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9.5 20v-6h5v6"></path></svg></a>
+    <a class="home" href="{{LIBRARY_HREF}}" aria-label="Back to Library">{{LOGO_SVG}}<span class="brand-copy"><strong>MNEMOSYNE</strong><span class="brand-sub">BOOK ANALYST</span></span></a>
   </nav>
   <section class="hero">
     <div>
@@ -45,6 +46,7 @@
 function readJson(id,fallback){var el=document.getElementById(id);if(!el)return fallback;var raw=el.textContent.trim();if(!raw||raw.indexOf("{{")>=0)return fallback;try{return JSON.parse(raw);}catch(e){return fallback;}}
 function escapeHtml(v){return String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 var book=readJson("book-data",{}), themeData=readJson("themes-data",{themes:[]}), chapterData=readJson("chapters-data",{chapters:[]}), evidenceData=readJson("evidence-data",{evidence:[]});
+document.title=(book.title||"Book Home")+" · Mnemosyne";
 document.getElementById("title").textContent=book.title||"Untitled Book";
 document.getElementById("coreQuestion").textContent=book.coreQuestion||"No book analysis has been injected yet.";
 document.getElementById("thesis").textContent=book.thesis||"Generate analysis/book.json to fill this page.";

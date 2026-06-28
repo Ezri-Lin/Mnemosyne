@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reading Library · 海报墙</title>
+<title>Mnemosyne · Reading Library</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/mnemosyne-logo.svg') }}">
 <style>
 :root {
   --ink: #171411; --muted: #6d6258; --paper: #f8f2e7; --paper-deep: #ece1cf;
@@ -27,6 +28,10 @@ body { margin:0; color:var(--ink); background:var(--bg); font-family:var(--font-
 .page { width:min(1380px,calc(100% - 48px)); margin:0 auto; padding:32px 0 60px; }
 
 .hero { padding:18px 0 28px; display:grid; grid-template-columns:1fr auto; gap:32px; align-items:end; }
+.brand-lockup { display:inline-flex; align-items:center; gap:10px; margin:0 0 16px; color:var(--ink); text-decoration:none; }
+.brand-lockup img { width:38px; height:38px; display:block; }
+.brand-lockup strong { display:block; font:900 15px/1 var(--font-display); letter-spacing:.12em; }
+.brand-sub { display:block; margin-top:4px; color:var(--muted); font:800 9px/1 var(--font-display); letter-spacing:.24em; }
 .eyebrow { margin:0 0 12px; color:var(--red); font:700 13px/1.3 var(--font-display); letter-spacing:.06em; }
 h1 { margin:0; font-size:clamp(36px,5vw,56px); line-height:1.0; font-weight:900; }
 .hero .subtitle { margin:12px 0 0; color:var(--ink-soft); font-size:17px; line-height:1.6; max-width:760px; }
@@ -163,6 +168,10 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
 
 <section class="hero">
   <div>
+    <a class="brand-lockup" href="/" aria-label="Mnemosyne library home">
+      <img src="{{ url_for('static', filename='brand/mnemosyne-logo.svg') }}" alt="Mnemosyne Codex Seal">
+      <span class="brand-copy"><strong>MNEMOSYNE</strong><span class="brand-sub">BOOK ANALYST</span></span>
+    </a>
     <p class="eyebrow">YOUR READING LIBRARY · GOD'S-EYE VIEW</p>
     <h1>Reading Wall</h1>
     <p class="subtitle">A bird's-eye view of every book you've touched. Click any cover → book Architecture page (or upload form if queued).</p>

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ book_title or slug }} — Mnemosyne</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/mnemosyne-logo.svg') }}">
 <link rel="stylesheet" href="/static/style.css">
 <style>
 body {
@@ -23,6 +24,20 @@ body {
 .topbar a {
   color:#3d332b;text-decoration:none;
   font:800 14px/1.4 "PingFang SC","Microsoft YaHei",sans-serif;
+}
+.brand-home {
+  display:inline-flex;align-items:center;gap:8px;
+  color:#171411;text-decoration:none;
+}
+.brand-home img { width:28px;height:28px;display:block; }
+.brand-home strong {
+  display:block;font:900 13px/1 "PingFang SC","Microsoft YaHei",sans-serif;
+  letter-spacing:.10em;
+}
+.brand-home .brand-sub {
+  display:block;margin-top:3px;color:#6d6258;
+  font:800 8px/1 "PingFang SC","Microsoft YaHei",sans-serif;
+  letter-spacing:.22em;
 }
 .topbar .sep { color:#6d6258;font-size:12px; }
 .page {
@@ -67,7 +82,10 @@ h1 {
 </head>
 <body>
 <div class="topbar">
-  <a href="/">&larr; Wall</a>
+  <a class="brand-home" href="/" aria-label="Mnemosyne library home">
+    <img src="{{ url_for('static', filename='brand/mnemosyne-logo.svg') }}" alt="Mnemosyne Codex Seal">
+    <span class="brand-copy"><strong>MNEMOSYNE</strong><span class="brand-sub">BOOK ANALYST</span></span>
+  </a>
   <span class="sep">/</span>
   <span style="font:700 13px/1.4 'PingFang SC','Microsoft YaHei',sans-serif;color:#171411;">{{ book_title or slug }}</span>
 </div>

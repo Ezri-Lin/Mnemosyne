@@ -4,6 +4,11 @@
 import argparse
 import json
 from pathlib import Path
+from urllib.parse import quote
+
+
+LOGO_SVG = """<svg class="mnemo-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="mnemo-logo-title mnemo-logo-desc" color="currentColor"><title id="mnemo-logo-title">Mnemosyne Codex Seal</title><desc id="mnemo-logo-desc">A double-ring codex seal with an open book and muse star.</desc><circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="50" cy="50" r="39.5" fill="none" stroke="currentColor" stroke-width="1.3"/><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M50 50 C43 46 33 45 26 47 L26 67 C33 65 43 66 50 70" stroke-width="2.8"/><path d="M50 50 C57 46 67 45 74 47 L74 67 C67 65 57 66 50 70" stroke-width="2.8"/><line x1="50" y1="50" x2="50" y2="70" stroke-width="2.8"/><path d="M45 52 C39 49 33 49 29 50" stroke-width="1.1"/><path d="M55 52 C61 49 67 49 71 50" stroke-width="1.1"/><path d="M45 56 C39 53 33 53 29 54" stroke-width="1.1"/><path d="M55 56 C61 53 67 53 71 54" stroke-width="1.1"/></g><path d="M50 22 L52 28.5 L58.5 30.5 L52 32.5 L50 39 L48 32.5 L41.5 30.5 L48 28.5 Z" fill="currentColor"/></svg>"""
+FAVICON_DATA_URI = "data:image/svg+xml," + quote(LOGO_SVG.replace('class="mnemo-mark" ', ""), safe="")
 
 
 def load_json(path, fallback):
@@ -27,13 +32,20 @@ def replace_many(text, values):
     return text
 
 
+def brand_values():
+    return {
+        "{{LOGO_SVG}}": LOGO_SVG,
+        "{{FAVICON_DATA_URI}}": FAVICON_DATA_URI,
+    }
+
+
 def render_library(config_path, books):
     config = read_config(config_path)
     templates = Path(config["installedAssets"]["pageTemplates"])
     web_root = Path(config["webOutputRoot"])
     web_root.mkdir(parents=True, exist_ok=True)
     template = (templates / "library-empty.html").read_text(encoding="utf-8")
-    output = replace_many(template, {"{{BOOKS_JSON}}": json_for_script(books)})
+    output = replace_many(template, {**brand_values(), "{{BOOKS_JSON}}": json_for_script(books)})
     path = web_root / "index.html"
     path.write_text(output, encoding="utf-8")
     return path
@@ -65,6 +77,7 @@ def render_book(config_path, book_id):
 
     book_home = (templates / "book-home-empty.html").read_text(encoding="utf-8")
     book_home = replace_many(book_home, {
+        **brand_values(),
         "{{BOOK_JSON}}": json_for_script(book),
         "{{THEMES_JSON}}": json_for_script(themes),
         "{{CHAPTERS_JSON}}": json_for_script(chapters),
@@ -83,6 +96,7 @@ def render_book(config_path, book_id):
         source = chapter_json_path(analysis_root / "chapters", chapter)
         chapter_data = load_json(source, {}) if source else {}
         rendered = replace_many(chapter_template, {
+            **brand_values(),
             "{{CHAPTER_JSON}}": json_for_script(chapter_data),
             "{{EVIDENCE_JSON}}": json_for_script(evidence),
             "{{LIBRARY_HREF}}": "../../index.html",

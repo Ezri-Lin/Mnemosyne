@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="static/brand/mnemosyne-logo.svg" alt="Mnemosyne Codex Seal" width="84">
+</p>
+
 # Mnemosyne
 
 > AI Book Analyst for visual reading maps, chapter guides, and reusable knowledge skills.
@@ -136,6 +140,69 @@ python skill/book-analyst/scripts/start_service.py --config .book-analyst/config
 ```
 
 After rerendering, refresh the browser. The static service does not need to restart.
+
+## Server Setup: Hermes + Obsidian Vault
+
+Use this path when the server uses Hermes as the AI Agent and an Obsidian vault as the durable book database.
+
+Clone and enter the repo:
+
+```bash
+git clone https://github.com/Ezri-Lin/Mnemosyne.git
+cd Mnemosyne
+```
+
+Install the skill into Hermes. Change the path if your Hermes skill folder is different:
+
+```bash
+./scripts/install-book-analyst --skills-dir "${HERMES_SKILLS_DIR:-$HOME/.hermes/skills}"
+```
+
+Configure the Obsidian vault path:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```bash
+VAULT_DIR=/home/lighthouse/Golden-House
+MNEMO_PORT_EXTERNAL=5052
+```
+
+Start Mnemosyne:
+
+```bash
+docker compose up -d --build
+```
+
+Open:
+
+```text
+http://<server-ip>:5052
+```
+
+Then restart Hermes and say:
+
+```text
+Use $book-analyst to configure my book library.
+My Obsidian vault is /home/lighthouse/Golden-House.
+Save book sources, analysis JSON, notes, and generated web pages under the vault.
+```
+
+Typical book output location:
+
+```text
+<Obsidian Vault>/5.0 Books & Reading/Books/<Book Title>/
+  source/
+  analysis/
+  notes/
+  web/index.html
+  web/chapters/*.html
+```
+
+Mnemosyne reads this vault output and serves the Library, Book Home, and Chapter Page HTML. Hermes does the analysis; Mnemosyne does storage, upload metadata, and display.
 
 ## Generate A Knowledge Skill
 

@@ -3,10 +3,10 @@ services:
     build: .
     container_name: mnemosyne
     ports:
-      - "5052:5000"
+      - "${MNEMO_PORT_EXTERNAL:-5052}:5000"
     volumes:
       - ./data:/app/data
-      - /home/lighthouse/Golden-House:/app/vault
+      - ${VAULT_DIR:-/home/lighthouse/Golden-House}:/app/vault
     environment:
       - DATABASE_URL=sqlite:////app/data/mnemosyne.db
       - MNEMO_LANG=zh

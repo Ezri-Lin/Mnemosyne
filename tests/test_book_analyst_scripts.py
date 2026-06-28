@@ -129,6 +129,10 @@ class BookAnalystScriptTests(unittest.TestCase):
             self.assertTrue(outputs["chapters"][0].exists())
             self.assertIn("Demo Book", outputs["bookHome"].read_text(encoding="utf-8"))
             self.assertNotIn("{{BOOK_JSON}}", outputs["bookHome"].read_text(encoding="utf-8"))
+            self.assertNotIn("{{LOGO_SVG}}", outputs["bookHome"].read_text(encoding="utf-8"))
+            self.assertNotIn("{{FAVICON_DATA_URI}}", outputs["chapters"][0].read_text(encoding="utf-8"))
+            self.assertIn("Mnemosyne Codex Seal", outputs["bookHome"].read_text(encoding="utf-8"))
+            self.assertIn("Mnemosyne Codex Seal", outputs["chapters"][0].read_text(encoding="utf-8"))
 
     def test_generate_book_skill_creates_skill_folder(self):
         generate_book_skill = load_script("generate_book_skill")

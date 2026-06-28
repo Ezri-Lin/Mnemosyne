@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chapter Page</title>
+<title>Mnemosyne · Chapter Page</title>
+<link rel="icon" type="image/svg+xml" href="{{FAVICON_DATA_URI}}">
 <style>
 :root{--ink:#171411;--muted:#6d6258;--paper:#f8f2e7;--paper-deep:#ece1cf;--line:#d8c8af;--red:#b9422f;--blue:#245f73;--green:#4d6f48;--gold:#c2872d;--teal:#1d4d5c;--white:#fffaf0;--surface:rgba(255,250,240,.64);--surface-strong:rgba(255,250,240,.76);--font-body:"Songti SC","Noto Serif CJK SC",Georgia,serif;--font-display:"PingFang SC","Microsoft YaHei",sans-serif;--bg:radial-gradient(circle at 22% 12%,rgba(194,135,45,.18),transparent 28rem),linear-gradient(135deg,#fbf6ec 0%,#efe1ca 100%)}
 *{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--bg);font-family:var(--font-body);transition:padding-right .25s}body.drawer-open{padding-right:420px}button{font:inherit;color:inherit}.page{width:min(1180px,calc(100% - 32px));margin:0 auto;padding:22px 0 38px}
-.top-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px}.home-link{display:inline-grid;place-items:center;width:30px;height:30px;background:var(--surface);border:1px solid var(--line);color:var(--ink);text-decoration:none;border-radius:5px}.home-link svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}.back-link{display:inline-block;padding:5px 12px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font:700 12px/1.4 var(--font-display);text-decoration:none;border-radius:5px}
+.top-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px}.home-link{display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);color:var(--ink);text-decoration:none;border-radius:7px;padding:6px 10px}.home-link .mnemo-mark{width:28px;height:28px;display:block;flex:0 0 auto}.home-link strong{display:block;font:900 13px/1 var(--font-display);letter-spacing:.11em}.home-link .brand-sub{display:block;margin-top:3px;color:var(--muted);font:800 8px/1 var(--font-display);letter-spacing:.22em}.back-link{display:inline-block;padding:8px 12px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font:700 12px/1.4 var(--font-display);text-decoration:none;border-radius:5px}
 .hero{padding:20px 0}.eyebrow{margin:0 0 10px;color:var(--red);font:800 12px/1.3 var(--font-display);letter-spacing:.05em}.hero h1{margin:0;font:900 clamp(30px,5vw,56px)/1.05 var(--font-display)}.lede{max-width:820px;color:var(--ink-soft,#3d332b);font-size:17px;line-height:1.65}
 .role-strip{display:grid;grid-template-columns:1.2fr repeat(3,.72fr);gap:10px;margin:0 0 16px}.role-card{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:13px 15px}.role-card.primary{border-left:4px solid var(--red);background:var(--surface-strong)}.role-card .lab{font:800 9px/1 var(--font-display);color:var(--muted);letter-spacing:.07em;text-transform:uppercase}.role-card .val{margin-top:7px;font:900 16px/1.32 var(--font-display)}.role-card p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55}
 .subtabs{display:flex;gap:4px;margin:12px 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}.subtab{padding:8px 14px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font:800 13px/1.3 var(--font-display);border-bottom:0}.subtab[aria-selected=true]{background:var(--ink);color:var(--white);border-color:var(--ink)}.panel{display:none}.panel.active{display:block}
@@ -19,7 +20,7 @@
 <body>
 <main class="page">
   <nav class="top-nav" aria-label="Chapter navigation">
-    <a class="home-link" href="{{LIBRARY_HREF}}" aria-label="Back to Library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9.5 20v-6h5v6"></path></svg></a>
+    <a class="home-link" href="{{LIBRARY_HREF}}" aria-label="Back to Library">{{LOGO_SVG}}<span class="brand-copy"><strong>MNEMOSYNE</strong><span class="brand-sub">BOOK ANALYST</span></span></a>
     <a class="back-link" href="{{BOOK_HOME_HREF}}">Back to Book Home</a>
   </nav>
   <section class="hero">
@@ -55,6 +56,7 @@ function escapeHtml(v){return String(v||"").replace(/&/g,"&amp;").replace(/</g,"
 function bindSourceButtons(){document.querySelectorAll(".src[data-ref]").forEach(function(btn){btn.onclick=function(){openDrawer(btn.getAttribute("data-ref"));};});}
 var chapter=readJson("chapter-data",{}), evidenceData=readJson("evidence-data",{evidence:[]});
 var evidenceById={};(evidenceData.evidence||[]).forEach(function(e){evidenceById[e.id]=e;});
+document.title=(chapter.readerTitle||chapter.originalTitle||"Chapter Page")+" · Mnemosyne";
 document.getElementById("chapterMeta").textContent="CHAPTER "+(chapter.chapterNumber||"");
 document.getElementById("chapterTitle").textContent=chapter.readerTitle||chapter.originalTitle||"Untitled Chapter";
 document.getElementById("chapterLine").textContent=chapter.oneLine||"Generate analysis/chapters/chXX.json to fill this page.";
