@@ -81,6 +81,10 @@ body.list-view .poster-card:hover { transform:translateX(4px); }
 .status-to-read { background:var(--status-to-read); }
 .status-paused { background:var(--status-paused); }
 .status-dropped { background:var(--status-dropped); }
+.parse-badge { position:absolute; top:36px; right:10px; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:900 9px/1 var(--font-display); color:var(--white); z-index:2; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+.parse-parsed { background:var(--green); }
+.parse-not-parsed { background:var(--muted); }
+
 .rating { position:absolute; bottom:8px; right:8px; font:700 11px/1 var(--font-display); color:var(--gold); letter-spacing:1px; text-shadow:0 1px 2px rgba(0,0,0,.5); z-index:2; }
 .rating-empty { position:absolute; bottom:8px; right:8px; font:700 10px/1 var(--font-display); color:rgba(255,255,255,.5); text-shadow:0 1px 2px rgba(0,0,0,.5); z-index:2; }
 
@@ -333,7 +337,7 @@ function renderCards() {
     var tagsHtml = (b.tags || []).slice(0, 2).map(function(t) {
       return '<span class="cover-tag">' + esc(t) + '</span>';
     }).join("");
-    var href = b.detail_url ? b.detail_url : ("#upload/" + b.slug);
+    var href; if (b.parse_status === "parsed") { href = "/book/" + b.slug + "/"; } else if (b.detail_url) { href = b.detail_url; } else { href = "#upload/" + b.slug; }
     return '<a class="poster-card" ' +
       'data-status="' + b.status + '" ' +
       'data-lang="' + b.lang + '" ' +
@@ -353,6 +357,7 @@ function renderCards() {
           '</div>' +
         '</div>' +
         '<div class="status-badge status-' + b.status + '">' + cfg.symbol + '</div>' +
+        '<div class="parse-badge parse-' + (b.parse_status || 'not-parsed') + '" title="' + ((b.parse_status === 'parsed') ? 'AI Analyzed' : 'Not Yet Analyzed') + '">' + ((b.parse_status === 'parsed') ? '&#10003;' : '?') + '</div>' +
         ratingHtml +
       '</div>' +
       '<div class="poster-meta">' +

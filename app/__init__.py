@@ -248,10 +248,20 @@ def make_slug(title, author):
 
 
 def get_all_books():
-    """Read all books from DB."""
+    """Read all books from DB, with parse status from vault."""
     session = get_session()
     books = []
     for b in session.query(Book).order_by(Book.title).all():
+        # Check if vault has web/index.html -> parsed
+        vault_path = b.vault_path or ''
+        parse_status = 'not-parsed'
+        if vault_path:
+            # Resolve to absolute path (vault_path stored as relative to vault root)
+            full_path = os.path.join(config.VAULT_DIR, vault_path) if not os.path.isabs(vault_path) else vault_path
+            web_index = os.path.join(full_path, 'web', 'index.html')
+            chapters_dir = os.path.join(full_path, 'web', 'chapters')
+            if os.path.exists(web_index) or (os.path.isdir(chapters_dir) and os.listdir(chapters_dir)):
+                parse_status = 'parsed'
         books.append({
             'slug': b.slug,
             'title': b.title,
@@ -263,6 +273,7 @@ def get_all_books():
             'tags': json.loads(b.tags) if b.tags else [],
             'added_at': b.added_at,
             'notes': b.notes,
+            'parse_status': parse_status,
         })
     session.close()
     return books
