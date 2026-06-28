@@ -291,26 +291,25 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
 
 <script>
 // ====== Book data (16 books) ======
-var books = {{ books | tojson | safe }}.map(function(b) {
-  // Generate icon from title initials
+// Shared palette and helper for cover styling
+var palettes = [
+  "linear-gradient(135deg,#b9422f,#c2872d)",
+  "linear-gradient(135deg,#245f73,#4d6f48)",
+  "linear-gradient(135deg,#4d6f48,#c2872d)",
+  "linear-gradient(135deg,#c2872d,#b9422f)",
+  "linear-gradient(135deg,#b9422f,#171411)",
+  "linear-gradient(135deg,#245f73,#171411)"
+];
+function enrichBook(b) {
   var words = (b.title || "").split(/[\s·]+/).filter(function(w) { return w.length > 0; });
   b.icon = words.slice(0, 2).map(function(w) { return w.charAt(0).toUpperCase(); }).join("");
-  // Generate cover style from a palette
-  var palettes = [
-    "linear-gradient(135deg,#b9422f,#c2872d)",
-    "linear-gradient(135deg,#245f73,#4d6f48)",
-    "linear-gradient(135deg,#4d6f48,#c2872d)",
-    "linear-gradient(135deg,#c2872d,#b9422f)",
-    "linear-gradient(135deg,#b9422f,#171411)",
-    "linear-gradient(135deg,#245f73,#171411)"
-  ];
   b.cover_style = palettes[Math.abs(hash(b.slug || b.title)) % palettes.length];
-  // Tags: use real tags if available, else []
   b.tags = b.tags || [];
   b.added_at = b.added_at || "2026-01-01";
   b.rating = b.rating || 0;
   return b;
-});
+}
+var books = {{ books | tojson | safe }}.map(enrichBook);
 
 function hash(s) {
   var h = 0;
@@ -625,15 +624,7 @@ function refreshBooks() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       // Apply the same enrichments as initial load
-      books = data.map(function(b) {
-        var words = (b.title || "").split(/[\s·]+/).filter(function(w) { return w.length > 0; });
-        b.icon = words.slice(0, 2).map(function(w) { return w.charAt(0).toUpperCase(); }).join("");
-        b.cover_style = palettes[Math.abs(hash(b.slug || b.title)) % palettes.length];
-        b.tags = b.tags || [];
-        b.added_at = b.added_at || "2026-01-01";
-        b.rating = b.rating || 0;
-        return b;
-      });
+      books = data.map(enrichBook);
       // Update stats
       renderStats();
       // Replace cards
