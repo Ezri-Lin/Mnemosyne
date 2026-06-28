@@ -38,8 +38,8 @@ h1 { margin:0; font-size:clamp(36px,5vw,56px); line-height:1.0; font-weight:900;
 
 /* === Filter Bar === */
 .filter-bar { position:sticky; top:0; z-index:50; padding:12px 0; margin-bottom:20px; border-bottom:1px solid var(--line); background:var(--bar-bg); backdrop-filter:blur(8px); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.filter-group { display:flex; gap:6px; align-items:center; padding-right:12px; border-right:1px solid var(--line); }
-.filter-group:last-of-type { border-right:0; }
+.filter-group { display:flex; gap:6px; align-items:center; }
+
 .filter-label { font:800 11px/1.4 var(--font-display); color:var(--muted); margin-right:4px; text-transform:uppercase; letter-spacing:.04em; }
 .filter-btn { padding:6px 12px; border:1px solid var(--line); background:var(--white); cursor:pointer; font:700 12px/1.4 var(--font-display); color:var(--ink-soft); border-radius:3px; transition:all .15s; white-space:nowrap; }
 .filter-btn:hover { border-color:var(--gold); }
@@ -345,7 +345,7 @@ function renderCards() {
     var tagsHtml = (b.tags || []).slice(0, 2).map(function(t) {
       return '<span class="cover-tag">' + esc(t) + '</span>';
     }).join("");
-    var href; if (b.parse_status === "parsed") { href = "/book/" + b.slug + "/"; } else if (b.detail_url) { href = b.detail_url; } else { href = "#upload/" + b.slug; }
+    var href = "/book/" + b.slug + "/";
     return '<a class="poster-card" ' +
       'data-status="' + b.status + '" ' +
       'data-lang="' + b.lang + '" ' +
