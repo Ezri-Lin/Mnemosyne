@@ -52,7 +52,7 @@ h1 { margin:0; font-size:clamp(36px,5vw,56px); line-height:1.0; font-weight:900;
 .view-toggle button { padding:6px 12px; border:0; background:var(--white); cursor:pointer; font:700 12px/1 var(--font-display); color:var(--ink-soft); border-right:1px solid var(--line); }
 .view-toggle button:last-child { border-right:0; }
 .view-toggle button.active { color:var(--white); background:var(--ink); }
-.upload-btn { padding:8px 16px; background:var(--red); color:var(--white); border:0; cursor:pointer; font:800 13px/1.4 var(--font-display); border-radius:3px; white-space:nowrap; }
+.upload-btn { padding:6px 14px; background:var(--red); color:var(--white); font-size:12px; border:0; cursor:pointer; font:800 13px/1.4 var(--font-display); border-radius:3px; white-space:nowrap; }
 .upload-btn:hover { background:var(--ink); }
 
 /* === Poster Grid === */
@@ -162,11 +162,11 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
     <p class="subtitle">A bird's-eye view of every book you've touched. Click any cover → book Architecture page (or upload form if queued).</p>
   </div>
   <div class="stats" id="stats"></div>
-  <button class="upload-btn" id="uploadBtn" style="align-self:center;">+ Upload Book</button>
 </section>
 
 <!-- FILTER BAR -->
 <div class="filter-bar">
+  <button class="upload-btn" id="uploadBtn">+ Add</button>
   <div class="filter-group">
     <span class="filter-label">Status</span>
     <button class="filter-btn active" data-filter="all">All <span class="count" id="cnt-all"></span></button>

@@ -137,7 +137,36 @@ def book_page(slug):
                         if web_index.exists():
                             return send_from_directory(web_index.parent, 'index.html')
                         break
-    return f"<h1>Book not yet analyzed: {slug}</h1><p><a href='/'>Back</a></p>"
+    return render_template('book-unparsed.html', slug=slug, book_title="Unknown")
+
+
+@app.route('/book/<slug>/<path:subpath>')
+def book_subpath(slug, subpath):
+    """Serve any sub-file under a book's web/ directory (chapters, CSS, images)."""
+    # Try generated dir first
+    gen_file = config.GENERATED_DIR / slug / subpath
+    if gen_file.exists():
+        return send_from_directory(gen_file.parent, gen_file.name)
+
+    # Fallback: case-insensitive vault search
+    for folder in config.VAULT_BOOKS_DIR.iterdir():
+        if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
+            web_file = folder / 'web' / subpath
+            if web_file.exists():
+                return send_from_directory(web_file.parent, web_file.name)
+            break
+    # Also check sub-dirs
+    for status_sub in ('Reading', 'To-Read', 'Completed'):
+        sub = config.VAULT_BOOKS_DIR / status_sub
+        if sub.exists():
+            for folder in sub.iterdir():
+                if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
+                    web_file = folder / 'web' / subpath
+                    if web_file.exists():
+                        return send_from_directory(web_file.parent, web_file.name)
+                    return "Not found", 404
+
+    return "Not found", 404
 
 
 @app.route('/chapter/<slug>/<chapter>.html')
@@ -379,6 +408,23 @@ def extract_epub_metadata(filepath):
         print(f"EPUB metadata extraction warning: {e}")
 
     return metadata
+
+@app.route('/api/parse/<slug>', methods=['POST'])
+def api_parse(slug):
+    """Trigger AI parsing for a book. Returns immediately, runs async."""
+    session = get_session()
+    book = session.query(Book).filter_by(slug=slug).first()
+    if not book:
+        return jsonify({'status': 'error', 'error': 'book not found'}), 404
+
+    # For now: acknowledge and queue (full impl later)
+    book.last_analyzed = 'queued'
+    session.commit()
+    session.close()
+    return jsonify({'status': 'ok', 'message': f'Parse queued for {slug}'})
+
+
+# Insert before analyze_book function
 
 def analyze_book(slug):
     """
