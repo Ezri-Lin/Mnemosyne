@@ -115,15 +115,28 @@ def poster_wall():
 
 @app.route('/book/<slug>/')
 def book_page(slug):
-    """Book architecture page. If HTML exists in data/generated/, serve it.
-    Else redirect to vault or show placeholder."""
+    """Book architecture page. First check generated/, then vault with case-insensitive matching."""
     gen_dir = config.GENERATED_DIR / slug
     if (gen_dir / 'index.html').exists():
         return send_from_directory(gen_dir, 'index.html')
-    # Fallback: check vault (synced)
-    vault_book = config.VAULT_BOOKS_DIR / slug
-    if (vault_book / 'web' / 'index.html').exists():
-        return send_from_directory(vault_book / 'web', 'index.html')
+    # Fallback: check vault — try case-insensitive folder match
+    if config.VAULT_BOOKS_DIR.exists():
+        for folder in config.VAULT_BOOKS_DIR.iterdir():
+            if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
+                web_index = folder / 'web' / 'index.html'
+                if web_index.exists():
+                    return send_from_directory(web_index.parent, 'index.html')
+                break
+        # Also check sub-dirs (Reading/ To-Read/ Completed/)
+        for status_sub in ('Reading', 'To-Read', 'Completed'):
+            sub = config.VAULT_BOOKS_DIR / status_sub
+            if sub.exists():
+                for folder in sub.iterdir():
+                    if folder.is_dir() and folder.name.lower().replace(' ', '-') == slug.lower():
+                        web_index = folder / 'web' / 'index.html'
+                        if web_index.exists():
+                            return send_from_directory(web_index.parent, 'index.html')
+                        break
     return f"<h1>Book not yet analyzed: {slug}</h1><p><a href='/'>Back</a></p>"
 
 
