@@ -46,7 +46,7 @@ h1 { margin:0; font-size:clamp(36px,5vw,56px); line-height:1.0; font-weight:900;
 .filter-btn:hover { border-color:var(--gold); }
 .filter-btn.active { color:var(--white); background:var(--ink); border-color:var(--ink); }
 .filter-btn .count { margin-left:5px; opacity:.6; font-size:11px; }
-.search-box { flex:1; min-width:160px; padding:7px 12px; border:1px solid var(--line); background:var(--white); font:400 13px/1.4 var(--font-display); border-radius:3px; outline:none; }
+.search-box { width:200px; min-width:140px; padding:7px 12px; border:1px solid var(--line); background:var(--white); font:400 13px/1.4 var(--font-display); border-radius:3px; outline:none; }
 .search-box:focus { border-color:var(--gold); background:var(--paper); }
 .sort-select { padding:6px 10px; border:1px solid var(--line); background:var(--white); font:700 12px/1.4 var(--font-display); color:var(--ink-soft); border-radius:3px; cursor:pointer; }
 .view-toggle { display:inline-flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; }
@@ -180,25 +180,23 @@ body.list-view .list-extras { display:flex; gap:10px; align-items:center; }
       <button class="filter-btn" data-filter="to-read">○ Queued <span class="count" id="cnt-to-read"></span></button>
       <button class="filter-btn" data-filter="paused">⏸ Paused <span class="count" id="cnt-paused"></span></button>
     </div>
-    <input type="text" class="search-box" id="searchBox" placeholder="Search title, author, tags...">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="filter-group">
+        <button class="filter-btn active" data-lang="all">EN+中文</button>
+        <button class="filter-btn" data-lang="en">EN</button>
+        <button class="filter-btn" data-lang="zh">中文</button>
+      </div>
+      <input type="text" class="search-box" id="searchBox" placeholder="Search...">
+    </div>
   </div>
 
   <!-- Row 2: Analyzed + Lang (left) | Sort (right) -->
   <div class="filter-row">
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-      <div class="filter-group">
-        <span class="filter-label">Analyzed</span>
-        <button class="filter-btn active" data-parse="all">All</button>
-        <button class="filter-btn" data-parse="parsed">✓ Parsed</button>
-        <button class="filter-btn" data-parse="not-parsed">? Not Yet</button>
-      </div>
-      <div style="width:1px;height:20px;background:var(--line);"></div>
-      <div class="filter-group">
-        <span class="filter-label">Language</span>
-        <button class="filter-btn active" data-lang="all">All</button>
-        <button class="filter-btn" data-lang="en">EN</button>
-        <button class="filter-btn" data-lang="zh">中文</button>
-      </div>
+    <div class="filter-group">
+      <span class="filter-label">Analyzed</span>
+      <button class="filter-btn active" data-parse="all">All</button>
+      <button class="filter-btn" data-parse="parsed">✓ Parsed</button>
+      <button class="filter-btn" data-parse="not-parsed">? Not Yet</button>
     </div>
     <select class="sort-select" id="sortSelect">
       <option value="recent">Sort: Recently Added</option>
