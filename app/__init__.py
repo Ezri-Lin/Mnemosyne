@@ -453,39 +453,78 @@ def extract_epub_metadata(filepath):
                 elif name_lower == 'language':
                     metadata['lang'] = value_str[:2].lower()
 
-        # Cover: multiple strategies
+        # Cover: 4 strategies, ordered by reliability
         try:
-            from bs4 import BeautifulSoup
             cover_id = None
             
-            # Strategy 1: <meta name="cover" content="..."/>
-            for item in book.get_items_of_type(9):  # ITEM_DOCUMENT
-                soup = BeautifulSoup(item.get_body_content(), 'xml')
-                meta = soup.find('meta', {'name': 'cover'})
-                if meta and meta.get('content'):
-                    cover_id = meta['content']
-                    break
-            
-            # Strategy 2: EPUB3 manifest item with properties="cover-image"
-            if not cover_id:
-                for item in book.get_items_of_type(9):
-                    soup = BeautifulSoup(item.get_body_content(), 'xml')
-                    manifest = soup.find('manifest') or soup.find('opf:manifest')
-                    if manifest:
-                        for el in manifest.find_all(['item', 'opf:item']):
-                            props = el.get('properties', '')
-                            if 'cover-image' in props:
-                                cover_id = el.get('id')
+            # Strategy 1: OPF <meta name="cover"> via book.metadata
+            # (ebooklib does NOT expose the OPF file as an item, but parses it into metadata)
+            opf_ns = 'http://www.idpf.org/2007/opf'
+            if opf_ns in book.metadata:
+                for name, values in book.metadata[opf_ns].items():
+                    if name == 'meta':
+                        for val in values:
+                            v, attrs = (val[0], val[1]) if isinstance(val, tuple) else (val, {})
+                            if attrs.get('name') == 'cover' and attrs.get('content'):
+                                cover_id = attrs['content']
                                 break
                     if cover_id:
                         break
             
-            # Strategy 3: item id contains "cover"
+            # Strategy 2: EPUB3 item with id='cover-image'
             if not cover_id:
                 for item in book.get_items():
-                    if 'cover' in (item.get_name() or '').lower():
+                    if (item.get_id() or '').lower() == 'cover-image':
                         cover_id = item.get_id()
                         break
+            
+            # Strategy 3: item id or filename contains "cover"
+            if not cover_id:
+                for item in book.get_items():
+                    n = (item.get_name() or '').lower()
+                    i = (item.get_id() or '').lower()
+                    if 'cover' in i or 'cover' in n:
+                        cover_id = item.get_id()
+                        break
+            
+            # Strategy 4: parse ZIP directly, find spine's first page, extract its first <img>
+            if not cover_id:
+                try:
+                    import zipfile
+                    zf = zipfile.ZipFile(str(filepath), 'r')
+                    container = BeautifulSoup(zf.read('META-INF/container.xml'), 'xml')
+                    opf_path = None
+                    for rf in container.find_all('rootfile'):
+                        opf_path = rf.get('full-path')
+                        break
+                    if opf_path:
+                        opf_xml = BeautifulSoup(zf.read(opf_path), 'xml')
+                        spine = opf_xml.find('spine') or opf_xml.find('opf:spine')
+                        if spine:
+                            refs = spine.find_all('itemref') or spine.find_all('opf:itemref')
+                            if refs:
+                                first_id = refs[0].get('idref')
+                                manifest = opf_xml.find('manifest') or opf_xml.find('opf:manifest')
+                                if manifest:
+                                    for el in manifest.find_all(['item', 'opf:item']):
+                                        if el.get('id') == first_id:
+                                            opf_dir = str(Path(opf_path).parent)
+                                            pg = str(Path(opf_dir) / el.get('href')) if opf_dir else el.get('href')
+                                            page_html = zf.read(pg).decode('utf-8', errors='replace')
+                                            page = BeautifulSoup(page_html, 'html.parser')
+                                            imgs = page.find_all('img')
+                                            if imgs:
+                                                pg_dir = str(Path(pg).parent)
+                                                img_p = str(Path(pg_dir) / imgs[0].get('src')) if pg_dir else imgs[0].get('src')
+                                                for item in book.get_items():
+                                                    if item.get_type() == 1 and item.get_name():
+                                                        if img_p.endswith(item.get_name().split('/')[-1]):
+                                                            cover_id = item.get_id()
+                                                            break
+                                            break
+                    zf.close()
+                except Exception:
+                    pass
             
             if cover_id:
                 cover_item = book.get_item_with_id(cover_id)
@@ -493,19 +532,6 @@ def extract_epub_metadata(filepath):
                     cover_path = Path(filepath).parent / 'cover.jpg'
                     cover_path.write_bytes(cover_item.get_content())
                     metadata['cover_path'] = str(cover_path)
-
-            # Strategy 4: fallback to first image that looks like a cover
-            if not cover_id:
-                for item in book.get_items():
-                    if item.get_type() == 1:  # ITEM_IMAGE
-                        name = (item.get_name() or '').lower()
-                        mid = (item.get_id() or '').lower()
-                        # Only use if filename suggests it's a cover
-                        if any(kw in name for kw in ['cover', 'cvi', '_001_', 'front']) or any(kw in mid for kw in ['cover', 'cvi']):
-                            cover_path = Path(filepath).parent / 'cover.jpg'
-                            cover_path.write_bytes(item.get_content())
-                            metadata['cover_path'] = str(cover_path)
-                            break
         except Exception:
             pass
 
